@@ -21,9 +21,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onSearch, onFilterClick, l
           <input
             type="text"
             onChange={(e) => onSearch(e.target.value)}
-            className="w-full h-11 pl-10 pr-4 bg-muted/50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            className="w-full h-11 pl-10 pr-20 bg-muted/50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             placeholder={lang === 'ru' ? "Поиск товаров..." : "Ҷустуҷӯи мол..."}
           />
+          {/* Smart Search Icons */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+             <button className="text-slate-400 hover:text-primary active:scale-95 transition-colors">
+                <Icon icon="solar:camera-minimalistic-bold" className="size-5" />
+             </button>
+             <button className="text-slate-400 hover:text-primary active:scale-95 transition-colors">
+                <Icon icon="solar:microphone-3-bold" className="size-5" />
+             </button>
+          </div>
         </div>
         
         {/* Filter Button */}

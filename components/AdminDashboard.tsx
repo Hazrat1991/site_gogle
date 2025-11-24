@@ -1,8 +1,13 @@
 
+
 import React, { useState } from 'react';
 import { Icon } from "@iconify/react";
-import { Product, Order, Customer, Category, Supplier, Employee, FinanceRecord, ActivityLog, PromoCode, SupportChat } from '../types';
-import { MOCK_SUPPLIERS, MOCK_EMPLOYEES, MOCK_FINANCE, MOCK_LOGS, MOCK_PROMOS, MOCK_SUPPORT_CHATS } from '../constants';
+import { Product, Order, Customer, Category, Department, StoreSettings, Supplier, EmployeeExtended, Shift, StaffFinancialRecord, FittingBooking, MediaItem, ActivityLog, PackingTable, WarehouseDocument, Review, SupportChat, PayoutRequest, StaticPage, DeliveryZone, NotificationCampaign, Attribute, AdminUser } from '../types';
+import { MOCK_DEPARTMENTS, MOCK_SETTINGS, MOCK_SUPPLIERS, MOCK_LOGS, MOCK_MEDIA_FILES, MOCK_CATEGORIES, MOCK_PACKING_TABLES, MOCK_WAREHOUSE_DOCUMENTS, MOCK_PENDING_REVIEWS, MOCK_SUPPORT_CHATS, MOCK_PAYOUTS, MOCK_PAGES, MOCK_ZONES, MOCK_NOTIFICATIONS, MOCK_ATTRIBUTES, MOCK_ADMIN_USERS } from '../constants';
+import { EmployeeManager } from './admin/EmployeeManager';
+import { KanbanBoard } from './admin/KanbanBoard';
+import { CourierMap } from './admin/CourierMap';
+import { PromoBuilder } from './admin/PromoBuilder';
 
 interface AdminDashboardProps {
   onBack: () => void;
@@ -14,822 +19,1252 @@ interface AdminDashboardProps {
   setCustomers: (c: Customer[]) => void;
   categories: Category[];
   setCategories: (c: Category[]) => void;
+  employees?: EmployeeExtended[];
+  setEmployees?: (e: EmployeeExtended[]) => void;
+  shifts?: Shift[];
+  setShifts?: (s: Shift[]) => void;
+  financialRecords?: StaffFinancialRecord[];
+  setFinancialRecords?: (f: StaffFinancialRecord[]) => void;
+  bookings?: FittingBooking[];
+  suppliers?: Supplier[];
+  setSuppliers?: (s: Supplier[]) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  onBack, products, setProducts, orders, setOrders, customers, setCustomers, categories, setCategories
-}) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [view, setView] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Default closed on mobile
-  
-  // Login State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+// --- RESTORED & NEW VIEWS ---
 
-  // New State for modules
-  const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [finance, setFinance] = useState<FinanceRecord[]>(MOCK_FINANCE);
-  const [logs, setLogs] = useState<ActivityLog[]>(MOCK_LOGS);
-  const [promos, setPromos] = useState<PromoCode[]>(MOCK_PROMOS);
-  const [supportChats, setSupportChats] = useState<SupportChat[]>(MOCK_SUPPORT_CHATS);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+const OverviewView: React.FC<{ products: Product[], orders: Order[], customers: Customer[] }> = ({ products, orders, customers }) => {
+  const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
+  const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0);
+  const outOfStock = products.filter(p => (p.stock || 0) === 0).length;
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email === 'admin@grand.com' && password === 'admin') {
-       setIsAuthenticated(true);
-       setError('');
-    } else {
-       setError('Неверный email или пароль');
-    }
-  };
-
-  const navItems = [
-    { id: 'dashboard', label: 'Главная', icon: 'solar:home-smile-bold' },
-    { id: 'reports', label: 'Отчеты', icon: 'solar:chart-square-bold' },
-    { id: 'products', label: 'Товары', icon: 'solar:t-shirt-bold' },
-    { id: 'categories', label: 'Категории', icon: 'solar:layers-minimalistic-bold' },
-    { id: 'orders', label: 'Заказы', icon: 'solar:bag-heart-bold' },
-    { id: 'finance', label: 'Финансы', icon: 'solar:wallet-money-bold' },
-    { id: 'coupons', label: 'Купоны', icon: 'solar:ticket-sale-bold' },
-    { id: 'support', label: 'Поддержка', icon: 'solar:chat-round-dots-bold' },
-    { id: 'suppliers', label: 'Поставщики', icon: 'solar:delivery-bold' },
-    { id: 'inventory', label: 'Склад', icon: 'solar:box-bold' },
-    { id: 'employees', label: 'Сотрудники', icon: 'solar:users-group-two-rounded-bold' },
-    { id: 'customers', label: 'Клиенты', icon: 'solar:users-group-rounded-bold' },
-    { id: 'marketing', label: 'Маркетинг', icon: 'solar:sale-bold' },
-    { id: 'reviews', label: 'Отзывы', icon: 'solar:chat-square-like-bold' },
-    { id: 'media', label: 'Медиа', icon: 'solar:gallery-bold' },
-    { id: 'logs', label: 'Логи', icon: 'solar:shield-warning-bold' },
-    { id: 'settings', label: 'Настройки', icon: 'solar:settings-bold' },
-  ];
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
-           <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-primary mb-2">Grand Market</h2>
-              <p className="text-slate-400">Вход для администратора</p>
-           </div>
-           <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                 <input 
-                   type="email" 
-                   value={email}
-                   onChange={e => setEmail(e.target.value)}
-                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
-                   placeholder="admin@grand.com"
-                 />
-              </div>
-              <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Пароль</label>
-                 <input 
-                   type="password"
-                   value={password}
-                   onChange={e => setPassword(e.target.value)}
-                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
-                   placeholder="admin"
-                 />
-              </div>
-              {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-              <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-orange-600 transition-colors">
-                 Войти
-              </button>
-           </form>
-           <button onClick={onBack} className="w-full mt-4 text-slate-400 text-sm hover:text-slate-600">Вернуться в магазин</button>
-        </div>
-      </div>
-    );
-  }
-
-  // --- Sub-Components for Views ---
-
-  const DashboardView = () => (
+  return (
     <div className="space-y-6 animate-fade-in">
-       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { label: 'Выручка', value: '3,450 с.', icon: 'solar:wallet-money-bold', color: 'text-primary bg-orange-50' },
-            { label: 'Прибыль', value: '1,200 с.', icon: 'solar:graph-new-up-bold', color: 'text-green-600 bg-green-50' },
-            { label: 'Заказы', value: orders.length, icon: 'solar:bag-bold', color: 'text-blue-600 bg-blue-50' },
-            { label: 'Склад (min)', value: products.filter(p => (p.stock || 0) < 5).length, icon: 'solar:danger-circle-bold', color: 'text-red-600 bg-red-50' },
-          ].map((stat, i) => (
-             <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-start justify-between gap-2">
-                <div className={`size-10 rounded-xl flex items-center justify-center ${stat.color}`}>
-                   <Icon icon={stat.icon} className="size-5" />
+       <h2 className="text-2xl font-bold mb-6">Обзор</h2>
+       
+       {/* Stats Cards */}
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+             <div className="size-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+                <Icon icon="solar:wallet-money-bold" className="size-6" />
+             </div>
+             <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Продажи</div>
+                <div className="text-2xl font-bold text-slate-800">{totalSales.toLocaleString()} c.</div>
+             </div>
+          </div>
+          
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+             <div className="size-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                <Icon icon="solar:bag-check-bold" className="size-6" />
+             </div>
+             <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Заказы</div>
+                <div className="text-2xl font-bold text-slate-800">{orders.length}</div>
+             </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+             <div className="size-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                <Icon icon="solar:users-group-rounded-bold" className="size-6" />
+             </div>
+             <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Клиенты</div>
+                <div className="text-2xl font-bold text-slate-800">{customers.length}</div>
+             </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+             <div className="size-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                <Icon icon="solar:t-shirt-bold" className="size-6" />
+             </div>
+             <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Товары</div>
+                <div className="text-2xl font-bold text-slate-800">{products.length}</div>
+             </div>
+          </div>
+       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Orders */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+             <h3 className="font-bold text-lg mb-4">Последние заказы</h3>
+             <div className="space-y-4">
+                {orders.slice(0, 4).map(order => (
+                   <div key={order.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border-b border-slate-50 last:border-0">
+                      <div className="flex items-center gap-3">
+                         <div className="size-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase">
+                            {order.customerName?.[0] || 'G'}
+                         </div>
+                         <div>
+                            <div className="font-bold text-slate-800">{order.customerName || 'Гость'}</div>
+                            <div className="text-xs text-slate-400">Заказ {order.id}</div>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <div className="font-bold text-primary mb-1">{order.total} c.</div>
+                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
+                            order.status === 'new' ? 'bg-green-100 text-green-600' :
+                            order.status === 'delivered' ? 'bg-slate-100 text-slate-600' :
+                            'bg-orange-100 text-orange-600'
+                         }`}>{order.status}</span>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+
+          {/* Stock Status */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+             <h3 className="font-bold text-lg mb-4">Статус склада</h3>
+             <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+                   <span className="text-slate-500 text-sm font-medium">Всего товаров</span>
+                   <span className="font-bold text-slate-800">{products.length}</span>
                 </div>
-                <div>
-                   <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">{stat.label}</p>
-                   <p className="text-lg font-bold text-slate-800">{stat.value}</p>
+                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+                   <span className="text-slate-500 text-sm font-medium">Общий остаток</span>
+                   <span className="font-bold text-slate-800">{totalStock} шт.</span>
+                </div>
+                <div className="flex justify-between items-center pb-2">
+                   <span className="text-slate-500 text-sm font-medium">Товаров без остатка</span>
+                   <span className="font-bold text-red-500">{outOfStock}</span>
                 </div>
              </div>
-          ))}
-       </div>
-       
-       {/* Short Logs */}
-       <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-          <h3 className="font-bold text-lg mb-4">Последние действия</h3>
-          <div className="space-y-3">
-             {logs.slice(0, 3).map(log => (
-               <div key={log.id} className="flex gap-3 items-start text-sm">
-                  <div className={`mt-1 size-2 rounded-full ${log.type === 'danger' ? 'bg-red-500' : log.type === 'warning' ? 'bg-orange-500' : 'bg-blue-500'}`} />
-                  <div>
-                    <span className="font-bold text-slate-700">{log.user}</span>: {log.action}
-                    <div className="text-xs text-slate-400">{log.date}</div>
-                  </div>
-               </div>
-             ))}
+             
+             {outOfStock > 0 && (
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-3">
+                   <Icon icon="solar:info-circle-bold" className="text-orange-500 size-5 shrink-0" />
+                   <p className="text-xs text-orange-700 leading-relaxed font-medium">
+                      {outOfStock} товара заканчиваются. Рекомендуем пополнить запасы в категории "Обувь".
+                   </p>
+                </div>
+             )}
           </div>
-          <button onClick={() => setView('logs')} className="w-full mt-4 py-2 text-primary text-sm font-bold">Все логи</button>
        </div>
     </div>
   );
+};
 
-  const ReportsView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <h2 className="text-2xl font-bold">Аналитика и Отчеты</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">ТОП Товар</h3>
-              <div className="flex items-center gap-3">
-                 <img src={products[0].images[0]} className="size-12 rounded-lg object-cover" alt="Product" />
-                 <div>
-                    <div className="font-bold line-clamp-1">{products[0].name}</div>
-                    <div className="text-xs text-green-600 font-bold">120 продаж</div>
-                 </div>
-              </div>
-           </div>
-           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">ТОП Клиент</h3>
-               <div className="flex items-center gap-3">
-                 <div className="size-12 rounded-full bg-primary text-white flex items-center justify-center font-bold">A</div>
-                 <div>
-                    <div className="font-bold">{customers[0].name}</div>
-                    <div className="text-xs text-green-600 font-bold">{customers[0].totalSpent} с. покупок</div>
-                 </div>
-              </div>
-           </div>
-           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Маржинальность</h3>
-               <div className="text-3xl font-bold text-slate-800">35%</div>
-               <div className="text-xs text-slate-400">Средняя по магазину</div>
-           </div>
-        </div>
+const ProductsView: React.FC<{ products: Product[], setProducts: (p: Product[]) => void }> = ({ products, setProducts }) => (
+  <div className="space-y-4 animate-fade-in">
+    <div className="flex justify-between items-center">
+       <h2 className="text-2xl font-bold">Товары</h2>
+       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+          <Icon icon="solar:add-circle-bold" />
+          Добавить товар
+       </button>
+    </div>
+    
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+      <table className="w-full text-left text-sm min-w-[800px]">
+         <thead className="bg-slate-50 text-slate-500">
+            <tr>
+               <th className="p-4">Фото</th>
+               <th className="p-4">Название</th>
+               <th className="p-4">Категория</th>
+               <th className="p-4">Цена</th>
+               <th className="p-4">Остаток</th>
+               <th className="p-4">Статус</th>
+               <th className="p-4">Действия</th>
+            </tr>
+         </thead>
+         <tbody className="divide-y divide-slate-100">
+            {products.map(p => (
+               <tr key={p.id} className="hover:bg-slate-50">
+                  <td className="p-4">
+                     <img src={p.images[0]} className="size-10 rounded-lg object-cover bg-slate-100" />
+                  </td>
+                  <td className="p-4 font-bold text-slate-800">{p.name}</td>
+                  <td className="p-4 text-slate-500 capitalize">{p.category}</td>
+                  <td className="p-4 font-bold">{p.price} с.</td>
+                  <td className={`p-4 font-bold ${p.stock && p.stock < 5 ? 'text-red-500' : 'text-slate-800'}`}>{p.stock} шт.</td>
+                  <td className="p-4">
+                     <span className={`px-2 py-1 rounded text-xs font-bold ${p.stock && p.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {p.stock && p.stock > 0 ? 'В наличии' : 'Нет в наличии'}
+                     </span>
+                  </td>
+                  <td className="p-4 flex gap-2">
+                     <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><Icon icon="solar:pen-bold" /></button>
+                     <button className="p-2 hover:bg-red-100 rounded-lg text-red-500"><Icon icon="solar:trash-bin-trash-bold" /></button>
+                  </td>
+               </tr>
+            ))}
+         </tbody>
+      </table>
+    </div>
+  </div>
+);
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-           <h3 className="font-bold text-lg mb-4">Финансовый результат (Октябрь)</h3>
-           <table className="w-full text-sm">
-              <tbody>
-                 <tr className="border-b border-slate-50">
-                    <td className="py-3 text-slate-500">Оборот (Выручка)</td>
-                    <td className="py-3 text-right font-bold">45,200 с.</td>
-                 </tr>
-                 <tr className="border-b border-slate-50">
-                    <td className="py-3 text-slate-500">Себестоимость продаж</td>
-                    <td className="py-3 text-right font-bold text-red-400">- 28,400 с.</td>
-                 </tr>
-                 <tr className="border-b border-slate-50">
-                    <td className="py-3 text-slate-500">Расходы (Аренда, ЗП)</td>
-                    <td className="py-3 text-right font-bold text-red-400">- 5,000 с.</td>
-                 </tr>
-                 <tr>
-                    <td className="py-3 font-bold text-lg">Чистая прибыль</td>
-                    <td className="py-3 text-right font-bold text-lg text-green-600">+ 11,800 с.</td>
-                 </tr>
-              </tbody>
-           </table>
-        </div>
-     </div>
-  );
-
-  const FinanceView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <div className="flex justify-between items-center">
-           <h2 className="text-2xl font-bold">Финансы</h2>
-           <button className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-red-200">
-             <Icon icon="solar:minus-circle-bold" /> Расход
-           </button>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-           <table className="w-full text-left text-sm min-w-[600px]">
-              <thead className="bg-slate-50 text-slate-500">
-                 <tr>
-                    <th className="p-4">Дата</th>
-                    <th className="p-4">Тип</th>
-                    <th className="p-4">Категория</th>
-                    <th className="p-4">Описание</th>
-                    <th className="p-4 text-right">Сумма</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                 {finance.map(rec => (
-                    <tr key={rec.id}>
-                       <td className="p-4 text-slate-500">{rec.date}</td>
-                       <td className="p-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${rec.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                             {rec.type === 'income' ? 'Доход' : 'Расход'}
-                          </span>
-                       </td>
-                       <td className="p-4 capitalize">{rec.category}</td>
-                       <td className="p-4 text-slate-600">{rec.description}</td>
-                       <td className={`p-4 text-right font-bold ${rec.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {rec.type === 'income' ? '+' : '-'} {rec.amount} с.
-                       </td>
-                    </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-     </div>
-  );
-
-  const CouponsView = () => (
-     <div className="space-y-6 animate-fade-in">
-        <div className="flex justify-between items-center">
-           <h2 className="text-2xl font-bold">Купоны и Промокоды</h2>
-           <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2">
-              <Icon icon="solar:ticket-sale-bold" /> Создать промокод
-           </button>
-        </div>
-        
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-           {promos.map(promo => (
-              <div key={promo.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden group">
-                 <div className="absolute top-0 right-0 p-2">
-                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${promo.active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                       {promo.active ? 'Активен' : 'Неактивен'}
-                    </span>
-                 </div>
-                 <div className="text-3xl font-bold tracking-wider text-slate-800 mb-1">{promo.code}</div>
-                 <div className="flex items-end gap-2 mb-4">
-                    <span className="text-4xl font-bold text-primary">{promo.discount}%</span>
-                    <span className="text-sm text-slate-400 font-medium mb-1">скидка</span>
-                 </div>
-                 <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-50 pt-3">
-                    <span>Использовано: {promo.usageCount} раз</span>
-                    <button className="text-blue-600 font-bold hover:underline">Изменить</button>
-                 </div>
-                 <div className="absolute -bottom-6 -right-6 size-24 bg-primary/5 rounded-full" />
-              </div>
-           ))}
-        </div>
-     </div>
-  );
-
-  const SupportView = () => {
-    const activeChat = supportChats.find(c => c.id === selectedChatId);
-
-    return (
-      <div className="flex h-[calc(100vh-100px)] bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-fade-in">
-         {/* Sidebar List */}
-         <div className={`w-full md:w-80 border-r border-slate-100 flex flex-col ${selectedChatId ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-4 border-b border-slate-100 bg-slate-50">
-               <h3 className="font-bold text-lg mb-2">Сообщения</h3>
-               <div className="flex gap-2">
-                  <button className="flex-1 bg-white border border-slate-200 rounded-lg py-1 text-xs font-bold text-slate-600 shadow-sm">Все</button>
-                  <button className="flex-1 bg-transparent border border-transparent rounded-lg py-1 text-xs font-bold text-slate-400 hover:bg-slate-100">Клиенты</button>
-                  <button className="flex-1 bg-transparent border border-transparent rounded-lg py-1 text-xs font-bold text-slate-400 hover:bg-slate-100">Сотрудники</button>
-               </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-               {supportChats.map(chat => (
-                  <div 
-                     key={chat.id} 
-                     onClick={() => setSelectedChatId(chat.id)}
-                     className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${selectedChatId === chat.id ? 'bg-slate-50' : ''}`}
-                  >
-                     <div className="flex justify-between items-start mb-1">
-                        <div className="font-bold text-sm text-slate-800">{chat.userName}</div>
-                        <div className="text-xs text-slate-400">{chat.timestamp}</div>
-                     </div>
-                     <div className="flex justify-between items-center">
-                        <div className="text-xs text-slate-500 line-clamp-1 pr-2">{chat.lastMessage}</div>
-                        {chat.unread > 0 && (
-                           <div className="size-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                              {chat.unread}
-                           </div>
-                        )}
-                     </div>
-                     <div className="mt-1">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                           chat.userRole === 'customer' ? 'bg-blue-100 text-blue-600' : 
-                           chat.userRole === 'seller' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'
-                        }`}>
-                           {chat.userRole === 'customer' ? 'Клиент' : chat.userRole === 'seller' ? 'Продавец' : 'Менеджер'}
-                        </span>
-                     </div>
-                  </div>
-               ))}
-            </div>
-         </div>
-
-         {/* Chat Window */}
-         <div className={`flex-1 flex flex-col bg-slate-50 ${!selectedChatId ? 'hidden md:flex' : 'flex'}`}>
-            {activeChat ? (
-               <>
-                  <div className="p-4 bg-white border-b border-slate-100 flex items-center gap-3 shadow-sm">
-                     <button onClick={() => setSelectedChatId(null)} className="md:hidden p-1">
-                        <Icon icon="solar:arrow-left-linear" className="size-6 text-slate-500" />
-                     </button>
-                     <div className="size-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">
-                        {activeChat.userName[0]}
-                     </div>
-                     <div>
-                        <div className="font-bold text-slate-800">{activeChat.userName}</div>
-                        <div className="text-xs text-green-600 flex items-center gap-1">
-                           <div className="size-1.5 rounded-full bg-green-600"></div> Онлайн
-                        </div>
-                     </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                     {activeChat.messages.map(msg => (
-                        <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                           <div className={`max-w-[75%] p-3 rounded-2xl text-sm shadow-sm ${
-                              msg.sender === 'me' ? 'bg-primary text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                           }`}>
-                              {msg.text}
-                              <div className={`text-[10px] text-right mt-1 ${msg.sender === 'me' ? 'text-white/70' : 'text-slate-300'}`}>
-                                 {msg.time}
-                              </div>
-                           </div>
-                        </div>
-                     ))}
-                  </div>
-                  <div className="p-4 bg-white border-t border-slate-100">
-                     <div className="flex gap-2">
-                        <button className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-lg">
-                           <Icon icon="solar:paperclip-bold" className="size-5" />
-                        </button>
-                        <input 
-                           type="text" 
-                           placeholder="Напишите сообщение..." 
-                           className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-                        />
-                        <button className="p-2 bg-primary text-white rounded-xl shadow-md hover:bg-orange-600 transition-colors">
-                           <Icon icon="solar:plain-bold" className="size-5" />
-                        </button>
-                     </div>
-                  </div>
-               </>
-            ) : (
-               <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                  <Icon icon="solar:chat-round-dots-linear" className="size-16 mb-4 opacity-20" />
-                  <p>Выберите чат для начала общения</p>
-               </div>
-            )}
-         </div>
-      </div>
-    );
-  };
-
-  const SuppliersView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <div className="flex justify-between items-center">
-           <h2 className="text-2xl font-bold">Поставщики</h2>
-           <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg">+ Поставщик</button>
-        </div>
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-           {suppliers.map(s => (
-              <div key={s.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative">
-                 <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg">{s.name}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${s.balance > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                       Долг: {s.balance} с.
-                    </span>
-                 </div>
-                 <p className="text-sm text-slate-500 mb-1">Контакт: {s.contactName}</p>
-                 <p className="text-sm text-slate-500 mb-4">{s.phone}</p>
-                 <div className="flex gap-2">
-                    <button className="flex-1 py-2 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-50">История</button>
-                    <button className="flex-1 py-2 bg-primary/10 text-primary rounded-lg text-xs font-bold hover:bg-primary/20">Поставка</button>
-                 </div>
-              </div>
-           ))}
-        </div>
-     </div>
-  );
-
-  const EmployeesView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <div className="flex justify-between items-center">
-           <h2 className="text-2xl font-bold">Сотрудники</h2>
-           <button className="bg-secondary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg">+ Сотрудник</button>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-           <table className="w-full text-left text-sm min-w-[500px]">
-              <thead className="bg-slate-50 text-slate-500">
-                 <tr>
-                    <th className="p-4">Имя</th>
-                    <th className="p-4">Роль</th>
-                    <th className="p-4">Статус</th>
-                    <th className="p-4">Активность</th>
-                    <th className="p-4 text-right">Действия</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                 {employees.map(emp => (
-                    <tr key={emp.id}>
-                       <td className="p-4 font-bold">{emp.name}</td>
-                       <td className="p-4">
-                          <span className="bg-slate-100 px-2 py-1 rounded text-xs uppercase font-bold text-slate-500">{emp.role}</span>
-                       </td>
-                       <td className="p-4">
-                          <span className="text-green-600 font-bold text-xs flex items-center gap-1">
-                             <div className="size-2 bg-green-600 rounded-full"></div> {emp.status}
-                          </span>
-                       </td>
-                       <td className="p-4 text-slate-500">{emp.lastActive}</td>
-                       <td className="p-4 text-right">
-                          <button className="text-blue-600 font-bold hover:underline">Изм.</button>
-                       </td>
-                    </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-     </div>
-  );
-
-  const InventoryView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <h2 className="text-2xl font-bold">Склад и Учет</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-           <div className="bg-red-50 border border-red-100 p-4 rounded-xl">
-              <h4 className="text-red-600 font-bold text-sm mb-1">Заканчивается</h4>
-              <p className="text-2xl font-bold text-red-800">12 <span className="text-sm font-normal">товаров</span></p>
-           </div>
-           <div className="bg-orange-50 border border-orange-100 p-4 rounded-xl">
-              <h4 className="text-orange-600 font-bold text-sm mb-1">Общая стоимость</h4>
-              <p className="text-2xl font-bold text-orange-800">1.2M <span className="text-sm font-normal">сомони</span></p>
-           </div>
-           <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
-              <h4 className="text-blue-600 font-bold text-sm mb-1">Поступления</h4>
-              <p className="text-2xl font-bold text-blue-800">+45 <span className="text-sm font-normal">на этой неделе</span></p>
+const FinanceView: React.FC = () => (
+  <div className="space-y-6 animate-fade-in">
+     <h2 className="text-2xl font-bold">Финансы</h2>
+     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg">
+           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Общий баланс</div>
+           <div className="text-3xl font-bold mb-4">124,500 с.</div>
+           <div className="flex gap-2">
+              <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs font-bold">+12%</span>
+              <span className="text-slate-400 text-xs flex items-center">за этот месяц</span>
            </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-           <table className="w-full text-left text-sm min-w-[600px]">
-              <thead className="bg-slate-50 text-slate-500">
-                 <tr>
-                    <th className="p-4">Товар</th>
-                    <th className="p-4">Категория</th>
-                    <th className="p-4 text-right">Закуп (с.)</th>
-                    <th className="p-4 text-right">Продажа (с.)</th>
-                    <th className="p-4 text-right">Маржа</th>
-                    <th className="p-4 text-right">Остаток</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                 {products.map(p => {
-                    const margin = p.buyPrice ? Math.round(((p.price - p.buyPrice) / p.price) * 100) : 0;
-                    return (
-                    <tr key={p.id}>
-                       <td className="p-4 font-medium">{p.name}</td>
-                       <td className="p-4 text-slate-500 text-xs">{p.category}</td>
-                       <td className="p-4 text-right text-slate-500">{p.buyPrice || '-'}</td>
-                       <td className="p-4 text-right font-bold">{p.price}</td>
-                       <td className="p-4 text-right">
-                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${margin > 30 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                             {margin}%
-                          </span>
-                       </td>
-                       <td className="p-4 text-right font-bold">
-                          {p.stock} шт.
-                       </td>
-                    </tr>
-                 )})}
-              </tbody>
-           </table>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Доходы</div>
+           <div className="text-3xl font-bold text-green-600 mb-4">+45,200 с.</div>
+           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full w-[70%] bg-green-500 rounded-full"></div>
+           </div>
         </div>
-     </div>
-  );
-
-  const MarketingView = () => (
-     <div className="space-y-6 animate-fade-in">
-        <h2 className="text-2xl font-bold">Маркетинг</h2>
-        
-        {/* Banners */}
-        <div>
-           <h3 className="font-bold text-lg mb-3">Баннеры на главной</h3>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="aspect-[2/1] bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center flex-col cursor-pointer hover:bg-slate-50">
-                 <Icon icon="solar:upload-square-bold" className="size-8 text-slate-400 mb-2" />
-                 <span className="text-sm text-slate-500 font-medium">Загрузить баннер</span>
-              </div>
-              <div className="aspect-[2/1] relative rounded-xl overflow-hidden shadow-sm group">
-                 <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80" className="w-full h-full object-cover" alt="Banner" />
-                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="bg-white text-red-500 px-4 py-2 rounded-lg font-bold text-sm">Удалить</button>
-                 </div>
-              </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Расходы</div>
+           <div className="text-3xl font-bold text-red-600 mb-4">-18,400 с.</div>
+           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full w-[30%] bg-red-500 rounded-full"></div>
            </div>
         </div>
      </div>
-  );
 
-  const LogsView = () => (
-     <div className="space-y-4 animate-fade-in">
-        <h2 className="text-2xl font-bold">История действий (Логи)</h2>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-           <div className="divide-y divide-slate-100">
-              {logs.map(log => (
-                 <div key={log.id} className="p-4 flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                    <div className="text-xs text-slate-400 font-mono w-32">{log.date}</div>
-                    <div className="flex-1">
-                       <span className="font-bold text-slate-800">{log.user}</span>
-                       <span className="text-slate-600 mx-2">→</span>
-                       <span className="text-slate-700">{log.action}</span>
+     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h3 className="font-bold text-lg mb-4">Последние транзакции</h3>
+        <div className="space-y-4">
+           {[
+             { id: 1, title: 'Продажа #ORD-7782', date: 'Сегодня, 14:30', amount: '+1,200', type: 'in' },
+             { id: 2, title: 'Закупка товара (Asia Textile)', date: 'Вчера, 10:00', amount: '-5,400', type: 'out' },
+             { id: 3, title: 'Зарплата (Рустам А.)', date: '25 Окт, 09:00', amount: '-2,500', type: 'out' },
+             { id: 4, title: 'Продажа #ORD-7780', date: '24 Окт, 16:45', amount: '+2,890', type: 'in' },
+           ].map(t => (
+              <div key={t.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                 <div className="flex items-center gap-3">
+                    <div className={`size-10 rounded-full flex items-center justify-center ${t.type === 'in' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                       <Icon icon={t.type === 'in' ? "solar:arrow-left-down-bold" : "solar:arrow-right-up-bold"} />
                     </div>
                     <div>
-                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                          log.type === 'danger' ? 'bg-red-100 text-red-600' : 
-                          log.type === 'warning' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
-                       }`}>
-                          {log.type}
-                       </span>
+                       <div className="font-bold text-slate-800">{t.title}</div>
+                       <div className="text-xs text-slate-500">{t.date}</div>
                     </div>
                  </div>
-              ))}
-           </div>
+                 <div className={`font-bold ${t.type === 'in' ? 'text-green-600' : 'text-slate-800'}`}>
+                    {t.amount} c.
+                 </div>
+              </div>
+           ))}
         </div>
      </div>
-  );
-  
-  const ReviewsView = () => (
-    <div className="space-y-4 animate-fade-in">
-      <h2 className="text-2xl font-bold">Отзывы клиентов</h2>
-      <div className="space-y-3">
-        {products.flatMap(p => p.reviews.map(r => ({...r, productName: p.name}))).map((review, idx) => (
-          <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-            <div className="flex justify-between mb-2">
-               <h4 className="font-bold text-sm">{review.productName}</h4>
-               <div className="flex text-yellow-400">
-                 {[...Array(5)].map((_, i) => (
-                   <Icon key={i} icon={i < review.rating ? "solar:star-bold" : "solar:star-linear"} className="size-3" />
-                 ))}
-               </div>
+  </div>
+);
+
+const CustomersView: React.FC<{ customers: Customer[] }> = ({ customers }) => (
+  <div className="space-y-4 animate-fade-in">
+     <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Клиенты</h2>
+        <div className="flex gap-2">
+           <input type="text" placeholder="Поиск..." className="p-2 border rounded-xl text-sm w-64 bg-white" />
+           <button className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm">Экспорт</button>
+        </div>
+     </div>
+     
+     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[800px]">
+           <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                 <th className="p-4">Клиент</th>
+                 <th className="p-4">Телефон</th>
+                 <th className="p-4">Заказов</th>
+                 <th className="p-4">Потрачено</th>
+                 <th className="p-4">Статус</th>
+                 <th className="p-4">Дата регистрации</th>
+              </tr>
+           </thead>
+           <tbody className="divide-y divide-slate-100">
+              {customers.map(c => (
+                 <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="p-4 font-bold text-slate-800">{c.name}</td>
+                    <td className="p-4 text-slate-600">{c.phone}</td>
+                    <td className="p-4 font-bold">{c.ordersCount}</td>
+                    <td className="p-4 text-green-600 font-bold">{c.totalSpent} с.</td>
+                    <td className="p-4">
+                       <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {c.status}
+                       </span>
+                    </td>
+                    <td className="p-4 text-slate-500">{c.joinDate}</td>
+                 </tr>
+              ))}
+           </tbody>
+        </table>
+     </div>
+  </div>
+);
+
+const SettingsView: React.FC = () => (
+   <div className="space-y-6 animate-fade-in max-w-4xl">
+      <h2 className="text-2xl font-bold">Настройки магазина</h2>
+      
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+         <h3 className="font-bold text-lg border-b border-slate-100 pb-2">Общие</h3>
+         <div className="grid grid-cols-2 gap-4">
+            <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Название магазина</label>
+               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="Grand Market" />
             </div>
-            <p className="text-sm text-slate-600 italic mb-2">"{review.comment}"</p>
-            <div className="flex justify-between items-center text-xs text-slate-400">
-               <span>{review.user} • {review.date}</span>
-               <button className="text-primary hover:underline">Ответить</button>
+            <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Валюта</label>
+               <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <option>TJS (Сомони)</option>
+                  <option>USD (Dollar)</option>
+               </select>
             </div>
-          </div>
-        ))}
-        {products.every(p => p.reviews.length === 0) && (
-           <div className="text-center py-10 text-slate-400">Нет отзывов</div>
-        )}
+            <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Телефон поддержки</label>
+               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="+992 900 00 00 00" />
+            </div>
+            <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
+               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="admin@grandmarket.tj" />
+            </div>
+         </div>
+
+         <h3 className="font-bold text-lg border-b border-slate-100 pb-2 pt-4">Оплата и Доставка</h3>
+         <div className="space-y-3">
+            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
+               <span className="font-bold text-slate-700">Принимать наличные</span>
+               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
+            </label>
+            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
+               <span className="font-bold text-slate-700">Принимать карты (POS-терминал)</span>
+               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
+            </label>
+            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
+               <span className="font-bold text-slate-700">Бесплатная доставка от 500 с.</span>
+               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
+            </label>
+         </div>
+
+         <div className="pt-4">
+            <button className="px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary/90">
+               Сохранить изменения
+            </button>
+         </div>
       </div>
-    </div>
-  );
+   </div>
+);
 
-  // New Components for Missing Modules
+const FittingRoomView: React.FC<{ bookings: FittingBooking[] }> = ({ bookings }) => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Бронирование примерочной (VIP)</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[700px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Клиент</th>
+                  <th className="p-4">Дата / Время</th>
+                  <th className="p-4">Товаров</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {bookings.map(b => (
+                  <tr key={b.id} className="hover:bg-slate-50">
+                     <td className="p-4">
+                        <div className="font-bold text-slate-800">{b.customerName}</div>
+                        <div className="text-xs text-slate-500">{b.customerPhone}</div>
+                     </td>
+                     <td className="p-4">
+                        <div className="font-bold text-primary">{b.timeSlot}</div>
+                        <div className="text-xs text-slate-500">{b.date}</div>
+                     </td>
+                     <td className="p-4">{b.items.length} шт.</td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${b.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                           {b.status}
+                        </span>
+                     </td>
+                     <td className="p-4">
+                        <button className="text-primary font-bold text-xs hover:underline">Подготовить вещи</button>
+                     </td>
+                  </tr>
+               ))}
+               {bookings.length === 0 && (
+                  <tr><td colSpan={5} className="p-4 text-center text-slate-400">Нет активных бронирований</td></tr>
+               )}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
 
-  const CategoriesView = () => (
-    <div className="space-y-4 animate-fade-in">
+const SupplierManagementView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers, setSuppliers }) => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Поставщики (B2B)</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Поставщик</th>
+                  <th className="p-4">Контакт</th>
+                  <th className="p-4">Баланс</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Рейтинг</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {suppliers.map(s => (
+                  <tr key={s.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{s.name}</td>
+                     <td className="p-4">
+                        <div>{s.contactName}</div>
+                        <div className="text-xs text-slate-500">{s.phone}</div>
+                     </td>
+                     <td className={`p-4 font-bold ${s.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>{s.balance} с.</td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'active' ? 'bg-green-100 text-green-700' : s.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                           {s.status}
+                        </span>
+                     </td>
+                     <td className="p-4 text-orange-400 font-bold">{s.rating} ★</td>
+                     <td className="p-4 flex gap-2">
+                        {s.status === 'pending' && (
+                           <button onClick={() => setSuppliers(suppliers.map(sup => sup.id === s.id ? {...sup, status: 'active'} : sup))} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">
+                              Одобрить
+                           </button>
+                        )}
+                        <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+// --- NEW SHOPS VIEW FOR MARKETPLACE ---
+const ShopsView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers, setSuppliers }) => (
+   <div className="space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
-         <h2 className="text-2xl font-bold">Категории</h2>
-         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg">+ Категория</button>
+         <h2 className="text-2xl font-bold">Магазины (Маркетплейс)</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+            <Icon icon="solar:shop-bold" />
+            Добавить магазин
+         </button>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-         {categories.map(cat => (
-            <div key={cat.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-primary cursor-pointer group">
-               <div className="flex justify-between items-start mb-3">
-                  <div className="size-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                     <Icon icon="solar:folder-bold" className="size-6" />
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Магазин</th>
+                  <th className="p-4">Владелец</th>
+                  <th className="p-4">Товаров</th>
+                  <th className="p-4">Комиссия</th>
+                  <th className="p-4">Баланс</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {suppliers.map(s => (
+                  <tr key={s.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{s.name}</td>
+                     <td className="p-4">
+                        <div>{s.contactName}</div>
+                        <div className="text-xs text-slate-500">{s.phone}</div>
+                     </td>
+                     <td className="p-4 font-bold">24</td>
+                     <td className="p-4 font-bold text-slate-600">{s.commissionRate || 10}%</td>
+                     <td className={`p-4 font-bold ${s.balance > 0 ? 'text-green-600' : 'text-slate-600'}`}>{s.balance} с.</td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'active' ? 'bg-green-100 text-green-700' : s.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                           {s.status}
+                        </span>
+                     </td>
+                     <td className="p-4 flex gap-2">
+                        {s.status === 'pending' && (
+                           <button onClick={() => setSuppliers(suppliers.map(sup => sup.id === s.id ? {...sup, status: 'active'} : sup))} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">Одобрить</button>
+                        )}
+                        <button className="text-slate-400 hover:text-primary"><Icon icon="solar:settings-bold" /></button>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+const DepartmentsView: React.FC = () => (
+  <div className="space-y-4 animate-fade-in">
+    <div className="flex justify-between items-center">
+       <h2 className="text-2xl font-bold">Отделы</h2>
+       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+          <Icon icon="solar:add-circle-bold" />
+          Добавить отдел
+       </button>
+    </div>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+      <table className="w-full text-left text-sm min-w-[600px]">
+         <thead className="bg-slate-50 text-slate-500">
+            <tr>
+               <th className="p-4">Название</th>
+               <th className="p-4">Описание</th>
+               <th className="p-4">Товаров</th>
+               <th className="p-4">Статус</th>
+               <th className="p-4">Действия</th>
+            </tr>
+         </thead>
+         <tbody className="divide-y divide-slate-100">
+            {MOCK_DEPARTMENTS.map(d => (
+               <tr key={d.id} className="hover:bg-slate-50">
+                  <td className="p-4 font-bold text-slate-800">{d.name}</td>
+                  <td className="p-4 text-slate-600">{d.description}</td>
+                  <td className="p-4">{d.productCount}</td>
+                  <td className="p-4">
+                     <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${d.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {d.status}
+                     </span>
+                  </td>
+                  <td className="p-4 flex gap-2">
+                     <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
+                  </td>
+               </tr>
+            ))}
+         </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const CategoriesView: React.FC = () => (
+  <div className="space-y-4 animate-fade-in">
+    <div className="flex justify-between items-center">
+       <h2 className="text-2xl font-bold">Категории</h2>
+       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+          <Icon icon="solar:add-circle-bold" />
+          Добавить категорию
+       </button>
+    </div>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+      <table className="w-full text-left text-sm min-w-[600px]">
+         <thead className="bg-slate-50 text-slate-500">
+            <tr>
+               <th className="p-4">Фото</th>
+               <th className="p-4">Название</th>
+               <th className="p-4">Подкатегории</th>
+               <th className="p-4">Отдел</th>
+               <th className="p-4">Действия</th>
+            </tr>
+         </thead>
+         <tbody className="divide-y divide-slate-100">
+            {MOCK_CATEGORIES.map(c => (
+               <tr key={c.id} className="hover:bg-slate-50">
+                  <td className="p-4">
+                     <img src={c.image} className="size-10 rounded-lg object-cover bg-slate-100" />
+                  </td>
+                  <td className="p-4 font-bold text-slate-800">{c.name}</td>
+                  <td className="p-4 text-slate-600 text-xs max-w-[200px] truncate">{c.subcategories.join(', ')}</td>
+                  <td className="p-4 text-slate-500">{MOCK_DEPARTMENTS.find(d => d.id === c.departmentId)?.name || '-'}</td>
+                  <td className="p-4 flex gap-2">
+                     <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
+                  </td>
+               </tr>
+            ))}
+         </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const MediaView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">Медиа библиотека</h2>
+         <button className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+            <Icon icon="solar:upload-bold" />
+            Загрузить
+         </button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+         {MOCK_MEDIA_FILES.map(file => (
+            <div key={file.id} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm group cursor-pointer">
+               <div className="aspect-square bg-slate-50 rounded-lg mb-2 overflow-hidden flex items-center justify-center relative">
+                  {file.type === 'image' ? (
+                     <img src={file.url} className="w-full h-full object-cover" />
+                  ) : (
+                     <Icon icon={file.type === 'video' ? "solar:videocamera-bold" : "solar:file-text-bold"} className="size-10 text-slate-300" />
+                  )}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                     <button className="text-white"><Icon icon="solar:eye-bold" /></button>
+                     <button className="text-red-400"><Icon icon="solar:trash-bin-trash-bold" /></button>
                   </div>
-                  <button className="text-slate-400 hover:text-red-500"><Icon icon="solar:trash-bin-minimalistic-bold" /></button>
                </div>
-               <h3 className="font-bold text-lg">{cat.name}</h3>
-               <p className="text-xs text-slate-400">{cat.subcategories.length} подкатегорий</p>
-               <div className="mt-3 flex gap-1 flex-wrap">
-                  {cat.subcategories.slice(0, 3).map(sub => (
-                     <span key={sub} className="text-[10px] bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">{sub}</span>
-                  ))}
-                  {cat.subcategories.length > 3 && <span className="text-[10px] bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">+{cat.subcategories.length - 3}</span>}
+               <div className="px-1">
+                  <div className="text-xs font-bold text-slate-800 truncate">{file.name}</div>
+                  <div className="text-xs text-slate-400">{file.size}</div>
                </div>
             </div>
          ))}
       </div>
-    </div>
-  );
+   </div>
+);
 
-  const MediaView = () => (
+const LogsView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Журнал действий (Логи)</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Время</th>
+                  <th className="p-4">Пользователь</th>
+                  <th className="p-4">Действие</th>
+                  <th className="p-4">Модуль</th>
+                  <th className="p-4">Детали</th>
+                  <th className="p-4">IP</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_LOGS.map(log => (
+                  <tr key={log.id} className="hover:bg-slate-50">
+                     <td className="p-4 text-slate-500 font-mono text-xs">{log.timestamp}</td>
+                     <td className="p-4">
+                        <div className="font-bold text-slate-800">{log.userName}</div>
+                        <div className="text-xs text-slate-400 uppercase">{log.userRole}</div>
+                     </td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                           log.actionType === 'create' ? 'bg-green-100 text-green-700' :
+                           log.actionType === 'delete' ? 'bg-red-100 text-red-700' :
+                           log.actionType === 'warning' ? 'bg-orange-100 text-orange-700' :
+                           'bg-blue-100 text-blue-700'
+                        }`}>
+                           {log.actionType}
+                        </span>
+                     </td>
+                     <td className="p-4 text-slate-600">{log.module}</td>
+                     <td className="p-4 text-slate-600">{log.details}</td>
+                     <td className="p-4 text-xs text-slate-400 font-mono">{log.ip}</td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+// --- NEW VIEWS FOR TABLES & WAREHOUSE ---
+
+const TablesView: React.FC = () => {
+   const [tables, setTables] = useState<PackingTable[]>(MOCK_PACKING_TABLES);
+   
+   return (
       <div className="space-y-4 animate-fade-in">
          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Медиа библиотека</h2>
-            <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2">
-               <Icon icon="solar:upload-minimalistic-bold" /> Загрузить
+            <h2 className="text-2xl font-bold">Столы упаковки (Сборка)</h2>
+            <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+               <Icon icon="solar:add-circle-bold" />
+               Добавить стол
             </button>
          </div>
-         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {products.flatMap(p => p.images).slice(0, 12).map((img, i) => (
-               <div key={i} className="aspect-square bg-white p-1 rounded-xl border border-slate-100 shadow-sm relative group">
-                  <img src={img} className="w-full h-full object-cover rounded-lg" alt="Media" />
-                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-2">
-                     <button className="text-white p-1 hover:scale-110"><Icon icon="solar:eye-bold" /></button>
-                     <button className="text-red-400 p-1 hover:scale-110"><Icon icon="solar:trash-bin-trash-bold" /></button>
+
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tables.map(table => (
+               <div key={table.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative group">
+                  <div className="flex justify-between items-start mb-4">
+                     <div>
+                        <h3 className="text-xl font-bold text-slate-800">{table.name}</h3>
+                        <div className="text-xs text-slate-500 font-medium">ID: {table.id}</div>
+                     </div>
+                     <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase ${table.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {table.status}
+                     </span>
+                  </div>
+
+                  <div className="space-y-4">
+                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <div className="text-xs text-slate-400 font-bold uppercase mb-1">Старший смены</div>
+                        <div className="flex items-center gap-2">
+                           <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">
+                              {table.supervisorName[0]}
+                           </div>
+                           <span className="font-bold text-sm">{table.supervisorName}</span>
+                        </div>
+                     </div>
+
+                     <div className="flex gap-2">
+                        <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                           <div className="text-xs text-slate-400 font-bold uppercase mb-1">Заказы</div>
+                           <div className="text-xl font-bold text-primary">{table.currentOrderIds.length}</div>
+                        </div>
+                        <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                           <div className="text-xs text-slate-400 font-bold uppercase mb-1">Всего</div>
+                           <div className="text-xl font-bold text-slate-800">{table.totalOrdersProcessed}</div>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="mt-6 flex gap-2">
+                     <button className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-slate-700 transition-colors">
+                        Назначить заказ
+                     </button>
+                     <button className="size-10 flex items-center justify-center bg-slate-100 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-50">
+                        <Icon icon="solar:trash-bin-trash-bold" />
+                     </button>
                   </div>
                </div>
             ))}
-         </div>
-      </div>
-  );
-
-  const SettingsView = () => (
-      <div className="space-y-6 animate-fade-in max-w-2xl">
-         <h2 className="text-2xl font-bold">Настройки магазина</h2>
-         
-         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-            <h3 className="font-bold text-lg border-b border-slate-50 pb-2">Общие</h3>
-            <div className="grid gap-4">
-               <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Название магазина</label>
-                  <input type="text" className="w-full p-2 border rounded-lg bg-slate-50" defaultValue="Grand Market Fashion" />
-               </div>
-               <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Валюта</label>
-                  <select className="w-full p-2 border rounded-lg bg-slate-50">
-                     <option>Сомони (TJS)</option>
-                     <option>Доллар (USD)</option>
-                  </select>
-               </div>
+            
+            {/* Add Table Placeholder */}
+            <div className="border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-primary hover:text-primary hover:bg-slate-50 transition-all cursor-pointer h-full min-h-[200px]">
+               <Icon icon="solar:add-circle-bold" className="size-10 mb-2" />
+               <span className="font-bold">Добавить новый стол</span>
             </div>
          </div>
+      </div>
+   );
+};
 
-         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-            <h3 className="font-bold text-lg border-b border-slate-50 pb-2">Уведомления</h3>
+const WarehouseView: React.FC = () => {
+   const [activeTab, setActiveTab] = useState<'all' | 'income' | 'writeoff' | 'transfer'>('all');
+   
+   return (
+      <div className="space-y-4 animate-fade-in">
+         <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Складские документы</h2>
+            <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+               <Icon icon="solar:file-text-bold" />
+               Создать документ
+            </button>
+         </div>
+
+         {/* Tabs */}
+         <div className="flex gap-2 overflow-x-auto pb-2">
+            {[
+               { id: 'all', label: 'Все документы' },
+               { id: 'income', label: 'Приходные' },
+               { id: 'writeoff', label: 'Списания' },
+               { id: 'transfer', label: 'Перемещения' }
+            ].map(tab => (
+               <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.id ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+               >
+                  {tab.label}
+               </button>
+            ))}
+         </div>
+
+         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[800px]">
+               <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                     <th className="p-4">№ Документа</th>
+                     <th className="p-4">Тип</th>
+                     <th className="p-4">Дата</th>
+                     <th className="p-4">Контрагент / Причина</th>
+                     <th className="p-4">Сумма</th>
+                     <th className="p-4">Товаров</th>
+                     <th className="p-4">Статус</th>
+                     <th className="p-4">Действия</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                  {MOCK_WAREHOUSE_DOCUMENTS.filter(d => activeTab === 'all' || d.type === activeTab).map(doc => (
+                     <tr key={doc.id} className="hover:bg-slate-50">
+                        <td className="p-4 font-mono font-bold text-slate-800">{doc.id}</td>
+                        <td className="p-4">
+                           <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                              doc.type === 'income' ? 'bg-green-100 text-green-700' :
+                              doc.type === 'writeoff' ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                           }`}>
+                              {doc.type === 'income' ? 'Приход' : doc.type === 'writeoff' ? 'Списание' : 'Перемещение'}
+                           </span>
+                        </td>
+                        <td className="p-4 text-slate-500">{doc.date}</td>
+                        <td className="p-4">
+                           <div className="font-bold text-slate-800">{doc.supplierName || '-'}</div>
+                           <div className="text-xs text-slate-400">{doc.comment}</div>
+                        </td>
+                        <td className="p-4 font-bold">{doc.totalAmount} с.</td>
+                        <td className="p-4">{doc.itemCount} шт.</td>
+                        <td className="p-4">
+                           <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${doc.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {doc.status === 'completed' ? 'Проведен' : 'Черновик'}
+                           </span>
+                        </td>
+                        <td className="p-4 flex gap-2">
+                           <button className="text-slate-400 hover:text-primary"><Icon icon="solar:eye-bold" /></button>
+                           <button className="text-slate-400 hover:text-primary"><Icon icon="solar:printer-bold" /></button>
+                        </td>
+                     </tr>
+                  ))}
+               </tbody>
+            </table>
+         </div>
+      </div>
+   );
+};
+
+// --- NEW VIEWS FOR REQUESTED MISSING SECTIONS ---
+
+const ReviewsView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Модерация отзывов</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Пользователь</th>
+                  <th className="p-4">Товар</th>
+                  <th className="p-4">Оценка</th>
+                  <th className="p-4">Комментарий</th>
+                  <th className="p-4">Дата</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_PENDING_REVIEWS.map(r => (
+                  <tr key={r.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{r.user}</td>
+                     <td className="p-4 text-primary font-medium">{r.productName}</td>
+                     <td className="p-4 text-orange-400 font-bold">{r.rating} ★</td>
+                     <td className="p-4 text-slate-600 max-w-xs">{r.comment}</td>
+                     <td className="p-4 text-slate-500 text-xs">{r.date}</td>
+                     <td className="p-4">
+                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase">Ожидает</span>
+                     </td>
+                     <td className="p-4 flex gap-2">
+                        <button className="bg-green-500 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-600">Одобрить</button>
+                        <button className="bg-red-50 text-red-500 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-100">Удалить</button>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+const SupportView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Служба поддержки</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 overflow-y-auto">
+            <h3 className="font-bold text-sm text-slate-500 uppercase mb-3">Активные чаты</h3>
             <div className="space-y-2">
-               <label className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Уведомлять о новых заказах (Email)</span>
-                  <input type="checkbox" defaultChecked className="accent-primary size-5" />
-               </label>
-               <label className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Уведомлять о низком остатке</span>
-                  <input type="checkbox" defaultChecked className="accent-primary size-5" />
-               </label>
+               {MOCK_SUPPORT_CHATS.map(chat => (
+                  <div key={chat.id} className="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 cursor-pointer flex gap-3">
+                     <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                        {chat.userName[0]}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center">
+                           <span className="font-bold text-slate-800 truncate">{chat.userName}</span>
+                           <span className="text-[10px] text-slate-400">{chat.timestamp}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 truncate">{chat.lastMessage}</div>
+                     </div>
+                     {chat.unread > 0 && <div className="size-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">{chat.unread}</div>}
+                  </div>
+               ))}
             </div>
          </div>
-         
-         <button className="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg w-full md:w-auto">Сохранить изменения</button>
+         <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400">
+            <Icon icon="solar:chat-round-line-bold" className="size-16 mb-2 opacity-50" />
+            <p>Выберите чат для просмотра</p>
+         </div>
       </div>
-  );
+   </div>
+);
+
+const PayoutsView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <h2 className="text-2xl font-bold">Выплаты продавцам</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+         <table className="w-full text-left text-sm min-w-[800px]">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Поставщик</th>
+                  <th className="p-4">Сумма</th>
+                  <th className="p-4">Метод</th>
+                  <th className="p-4">Дата</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_PAYOUTS.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{p.supplierName}</td>
+                     <td className="p-4 font-bold text-slate-800">{p.amount} с.</td>
+                     <td className="p-4 text-slate-600">{p.method}</td>
+                     <td className="p-4 text-slate-500">{p.date}</td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${p.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                           {p.status}
+                        </span>
+                     </td>
+                     <td className="p-4">
+                        {p.status === 'pending' && <button className="bg-green-500 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-600">Выплатить</button>}
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+const ProductApprovalView: React.FC<{ products: Product[] }> = ({ products }) => {
+   const pendingProducts = products.filter(p => p.approvalStatus === 'pending');
+   return (
+      <div className="space-y-4 animate-fade-in">
+         <h2 className="text-2xl font-bold">Модерация товаров</h2>
+         {pendingProducts.length === 0 ? (
+            <div className="p-10 text-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+               Нет товаров ожидающих проверки
+            </div>
+         ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+               <table className="w-full text-left text-sm min-w-[800px]">
+                  <thead className="bg-slate-50 text-slate-500">
+                     <tr>
+                        <th className="p-4">Фото</th>
+                        <th className="p-4">Название</th>
+                        <th className="p-4">Цена</th>
+                        <th className="p-4">Продавец</th>
+                        <th className="p-4">Действия</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                     {pendingProducts.map(p => (
+                        <tr key={p.id} className="hover:bg-slate-50">
+                           <td className="p-4"><img src={p.images[0]} className="size-12 rounded-lg bg-slate-100" /></td>
+                           <td className="p-4 font-bold text-slate-800">{p.name}</td>
+                           <td className="p-4">{p.price} с.</td>
+                           <td className="p-4 text-slate-600">ID: {p.supplierId}</td>
+                           <td className="p-4 flex gap-2">
+                              <button className="bg-green-500 text-white px-3 py-1 rounded-lg text-xs font-bold">Одобрить</button>
+                              <button className="bg-red-50 text-red-500 px-3 py-1 rounded-lg text-xs font-bold">Отклонить</button>
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            </div>
+         )}
+      </div>
+   );
+};
+
+const CMSView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">CMS / Страницы</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить страницу</button>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+         <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Заголовок</th>
+                  <th className="p-4">Slug (URL)</th>
+                  <th className="p-4">Обновлено</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_PAGES.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{p.title}</td>
+                     <td className="p-4 text-slate-500 font-mono">/{p.slug}</td>
+                     <td className="p-4 text-slate-500">{p.lastUpdated}</td>
+                     <td className="p-4">
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">Активна</span>
+                     </td>
+                     <td className="p-4">
+                        <button className="text-primary font-bold hover:underline">Редактировать</button>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+const DeliveryZonesView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">Зоны доставки</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить зону</button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+         <div className="space-y-3">
+            {MOCK_ZONES.map(z => (
+               <div key={z.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                     <div className="size-4 rounded-full" style={{ backgroundColor: z.color }}></div>
+                     <div>
+                        <div className="font-bold text-slate-800">{z.name}</div>
+                        <div className="text-xs text-slate-500">{z.description}</div>
+                     </div>
+                  </div>
+                  <div className="font-bold text-primary">{z.cost} с.</div>
+               </div>
+            ))}
+         </div>
+         <div className="bg-slate-100 rounded-xl min-h-[300px] flex items-center justify-center text-slate-400 border border-slate-200">
+            <Icon icon="solar:map-point-bold" className="size-12 mb-2" />
+            <span className="text-sm">Интерактивная карта</span>
+         </div>
+      </div>
+   </div>
+);
+
+const NotificationsView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">Маркетинг (Push/SMS)</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Создать рассылку</button>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+         <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Заголовок</th>
+                  <th className="p-4">Тип</th>
+                  <th className="p-4">Получателей</th>
+                  <th className="p-4">Дата</th>
+                  <th className="p-4">Статус</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_NOTIFICATIONS.map(n => (
+                  <tr key={n.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{n.title}</td>
+                     <td className="p-4 uppercase text-xs font-bold">{n.type}</td>
+                     <td className="p-4">{n.recipientsCount}</td>
+                     <td className="p-4 text-slate-500">{n.sentDate}</td>
+                     <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${n.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                           {n.status}
+                        </span>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+const AttributesView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">Атрибуты и Справочники</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить атрибут</button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         {MOCK_ATTRIBUTES.map(attr => (
+            <div key={attr.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+               <div className="text-xs text-slate-400 font-bold uppercase mb-1">{attr.type}</div>
+               <div className="font-bold text-slate-800 flex items-center gap-2">
+                  {attr.type === 'color' && <div className="size-4 rounded-full border border-slate-200" style={{ backgroundColor: attr.value }}></div>}
+                  {attr.name}
+               </div>
+            </div>
+         ))}
+      </div>
+   </div>
+);
+
+const ACLView: React.FC = () => (
+   <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold">Роли и Доступы</h2>
+         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить пользователя</button>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+         <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+               <tr>
+                  <th className="p-4">Имя</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">Роль</th>
+                  <th className="p-4">Последний вход</th>
+                  <th className="p-4">Статус</th>
+                  <th className="p-4">Действия</th>
+               </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               {MOCK_ADMIN_USERS.map(u => (
+                  <tr key={u.id} className="hover:bg-slate-50">
+                     <td className="p-4 font-bold text-slate-800">{u.name}</td>
+                     <td className="p-4 text-slate-500">{u.email}</td>
+                     <td className="p-4 uppercase text-xs font-bold text-primary">{u.role}</td>
+                     <td className="p-4 text-slate-500">{u.lastLogin}</td>
+                     <td className="p-4">
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">{u.status}</span>
+                     </td>
+                     <td className="p-4 flex gap-2">
+                        <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
+                        <button className="text-slate-400 hover:text-red-500"><Icon icon="solar:trash-bin-trash-bold" /></button>
+                     </td>
+                  </tr>
+               ))}
+            </tbody>
+         </table>
+      </div>
+   </div>
+);
+
+// --- MAIN ADMIN DASHBOARD COMPONENT ---
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  onBack, products, setProducts, orders, setOrders, customers, setCustomers, categories, setCategories,
+  employees = [], setEmployees = () => {}, shifts = [], setShifts = () => {}, financialRecords = [], setFinancialRecords = () => {},
+  bookings = [], suppliers = MOCK_SUPPLIERS, setSuppliers = () => {}
+}) => {
+  const [activeView, setActiveView] = useState('overview');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const menuItems = [
+    { id: 'overview', label: 'Обзор', icon: 'solar:chart-square-bold' },
+    { id: 'orders', label: 'Заказы', icon: 'solar:bag-check-bold' },
+    { id: 'tables', label: 'Столы (Сборка)', icon: 'solar:box-minimalistic-bold' }, 
+    { id: 'warehouse', label: 'Склад', icon: 'solar:clipboard-list-bold' }, 
+    { id: 'fitting', label: 'Примерочная', icon: 'solar:hanger-2-bold' },
+    { id: 'products', label: 'Товары', icon: 'solar:t-shirt-bold' },
+    { id: 'approval', label: 'Модерация', icon: 'solar:check-circle-bold' }, // Added
+    { id: 'reviews', label: 'Отзывы', icon: 'solar:star-bold' }, // Added
+    { id: 'support', label: 'Поддержка', icon: 'solar:chat-round-dots-bold' }, // Added
+    { id: 'categories', label: 'Категории', icon: 'solar:layers-bold' },
+    { id: 'departments', label: 'Отделы', icon: 'solar:sitemap-bold' },
+    { id: 'finance', label: 'Финансы', icon: 'solar:bill-list-bold' }, 
+    { id: 'payouts', label: 'Выплаты', icon: 'solar:card-transfer-bold' }, // Added
+    { id: 'customers', label: 'Клиенты', icon: 'solar:users-group-rounded-bold' },
+    { id: 'returns', label: 'Возвраты (RMA)', icon: 'solar:restart-bold' },
+    { id: 'shops', label: 'Магазины', icon: 'solar:shop-2-bold' },
+    { id: 'suppliers_admin', label: 'Поставщики', icon: 'solar:shop-bold' },
+    { id: 'employees', label: 'Сотрудники', icon: 'solar:user-id-bold' },
+    { id: 'promotions', label: 'Акции', icon: 'solar:gift-bold' }, 
+    { id: 'couriers', label: 'Карта курьеров', icon: 'solar:map-point-bold' },
+    { id: 'delivery_zones', label: 'Зоны доставки', icon: 'solar:map-arrow-up-bold' }, // Added 
+    { id: 'notifications', label: 'Маркетинг', icon: 'solar:bell-bing-bold' }, // Added
+    { id: 'cms', label: 'CMS', icon: 'solar:file-text-bold' }, // Added
+    { id: 'media', label: 'Медиа', icon: 'solar:gallery-bold' },
+    { id: 'attributes', label: 'Атрибуты', icon: 'solar:tag-bold' }, // Added
+    { id: 'acl', label: 'Роли', icon: 'solar:shield-user-bold' }, // Added
+    { id: 'logs', label: 'Логи', icon: 'solar:history-bold' },
+    { id: 'settings', label: 'Настройки', icon: 'solar:settings-bold' },
+  ];
+
+  const renderContent = () => {
+    switch(activeView) {
+      case 'overview': return <OverviewView products={products} orders={orders} customers={customers} />;
+      case 'orders': return <KanbanBoard orders={orders} onUpdateStatus={() => {}} />; 
+      case 'tables': return <TablesView />; 
+      case 'warehouse': return <WarehouseView />; 
+      case 'fitting': return <FittingRoomView bookings={bookings} />;
+      case 'products': return <ProductsView products={products} setProducts={setProducts} />;
+      case 'approval': return <ProductApprovalView products={products} />; // Added
+      case 'reviews': return <ReviewsView />; // Added
+      case 'support': return <SupportView />; // Added
+      case 'categories': return <CategoriesView />;
+      case 'departments': return <DepartmentsView />;
+      case 'finance': return <FinanceView />;
+      case 'payouts': return <PayoutsView />; // Added
+      case 'customers': return <CustomersView customers={customers} />;
+      case 'returns': return <div className="text-center p-10 text-slate-400">Возвраты (Демонстрация)</div>;
+      case 'shops': return <ShopsView suppliers={suppliers} setSuppliers={setSuppliers} />;
+      case 'suppliers_admin': return <SupplierManagementView suppliers={suppliers} setSuppliers={setSuppliers} />;
+      case 'employees': return <EmployeeManager employees={employees} setEmployees={setEmployees} shifts={shifts} setShifts={setShifts} financialRecords={financialRecords} setFinancialRecords={setFinancialRecords} />;
+      case 'promotions': return <PromoBuilder />;
+      case 'couriers': return <CourierMap />;
+      case 'delivery_zones': return <DeliveryZonesView />; // Added
+      case 'notifications': return <NotificationsView />; // Added
+      case 'cms': return <CMSView />; // Added
+      case 'media': return <MediaView />;
+      case 'attributes': return <AttributesView />; // Added
+      case 'acl': return <ACLView />; // Added
+      case 'logs': return <LogsView />;
+      case 'settings': return <SettingsView />;
+      default: return <div className="text-center p-10 text-slate-400">Выберите пункт меню</div>;
+    }
+  };
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Sidebar for Desktop */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-100 transform transition-transform duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
-         <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-            <div className="text-xl font-extrabold text-primary">GM<span className="text-secondary">ADMIN</span></div>
-            <button className="md:hidden" onClick={() => setSidebarOpen(false)}>
-               <Icon icon="solar:close-circle-bold" className="size-6 text-slate-400" />
-            </button>
-         </div>
-         <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-80px)] pb-20">
-            {navItems.map(item => (
-               <button 
-                 key={item.id}
-                 onClick={() => { setView(item.id); setSidebarOpen(false); }}
-                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${view === item.id ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-slate-500 hover:bg-slate-50'}`}
-               >
-                  <Icon icon={item.icon} className="size-5" />
-                  {item.label}
-               </button>
-            ))}
-            <div className="pt-4 mt-4 border-t border-slate-50">
-               <button onClick={onBack} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors">
-                  <Icon icon="solar:logout-bold-duotone" className="size-5" />
-                  Выйти в магазин
-               </button>
-            </div>
-         </nav>
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
+      <aside className={`bg-white border-r border-slate-100 flex flex-col shrink-0 z-20 transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+        <div className={`p-6 border-b border-slate-50 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+           {!isSidebarCollapsed && (
+              <div className="flex flex-col">
+                 <span className="text-xl font-extrabold text-primary tracking-tighter">
+                   GRAND<span className="text-secondary">ADMIN</span>
+                 </span>
+                 <span className="text-[10px] uppercase tracking-widest text-slate-400">Panel v1.0</span>
+              </div>
+           )}
+           <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="text-slate-400 hover:text-primary transition-colors">
+               <Icon icon={isSidebarCollapsed ? "solar:double-alt-arrow-right-bold-duotone" : "solar:double-alt-arrow-left-bold-duotone"} className="size-6" />
+           </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+           {menuItems.map(item => (
+             <button
+               key={item.id}
+               onClick={() => setActiveView(item.id)}
+               title={isSidebarCollapsed ? item.label : ''}
+               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                 activeView === item.id 
+                   ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+               } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+             >
+               <Icon icon={item.icon} className="size-6 shrink-0" />
+               {!isSidebarCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
+             </button>
+           ))}
+        </nav>
+
+        <div className="p-4 border-t border-slate-50">
+           <button 
+             onClick={onBack}
+             title={isSidebarCollapsed ? 'Выйти в магазин' : ''}
+             className={`w-full flex items-center gap-2 px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors ${isSidebarCollapsed ? 'justify-center' : 'justify-center'}`}
+           >
+             <Icon icon="solar:logout-bold-duotone" className="size-5 shrink-0" />
+             {!isSidebarCollapsed && <span className="whitespace-nowrap">Выйти в магазин</span>}
+           </button>
+        </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
-         {/* Mobile Header */}
-         <header className="md:hidden bg-white px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-             <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-50 rounded-lg">
-                <Icon icon="solar:hamburger-menu-bold" className="size-6 text-slate-600" />
-             </button>
-             <span className="font-bold text-slate-800">Админ Панель</span>
-             <div className="size-8 rounded-full bg-primary text-white flex items-center justify-center font-bold">A</div>
+      <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+         <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0">
+            <h1 className="text-lg font-bold text-slate-800">{menuItems.find(i => i.id === activeView)?.label}</h1>
+            <div className="flex items-center gap-4">
+               <button className="size-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 relative">
+                  <Icon icon="solar:bell-bold" className="size-5" />
+                  <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-white"></span>
+               </button>
+               <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
+                  <div className="size-8 rounded-full bg-slate-200 overflow-hidden">
+                     <Icon icon="solar:user-bold" className="size-full p-1 text-slate-500" />
+                  </div>
+                  <span className="text-sm font-bold">Admin</span>
+               </div>
+            </div>
          </header>
 
-         <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide pb-safe">
-            {view === 'dashboard' && <DashboardView />}
-            {view === 'reports' && <ReportsView />}
-            {view === 'products' && (
-               <div className="animate-fade-in">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold">Товары</h2>
-                    <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm">+ Добавить</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {products.map(p => (
-                      <div key={p.id} className="bg-white p-3 rounded-xl border border-slate-100 flex gap-3">
-                        <img src={p.images[0]} className="size-16 rounded-lg object-cover bg-slate-100" alt={p.name} />
-                        <div className="flex-1">
-                          <div className="font-bold text-sm line-clamp-1">{p.name}</div>
-                          <div className="text-xs text-slate-400 mb-1">Ост: {p.stock} шт.</div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-primary">{p.price} с.</span>
-                            <button className="text-blue-600 text-xs font-bold">Изм.</button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-               </div>
-            )}
-            {view === 'orders' && (
-               <div className="animate-fade-in">
-                  <h2 className="text-2xl font-bold mb-4">Заказы</h2>
-                  <div className="space-y-3">
-                     {orders.map(order => (
-                        <div key={order.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-                           <div>
-                              <div className="font-bold text-lg">{order.id} <span className="text-sm font-normal text-slate-400">от {order.date}</span></div>
-                              <div className="text-sm text-slate-600">{order.customerName} • {order.customerPhone}</div>
-                           </div>
-                           <div className="flex items-center gap-4">
-                              <div className="font-bold text-lg">{order.total} с.</div>
-                              <select 
-                                value={order.status}
-                                onChange={(e) => {
-                                   const newStatus = e.target.value as any;
-                                   setOrders(orders.map(o => o.id === order.id ? {...o, status: newStatus} : o));
-                                }}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-bold border-none outline-none cursor-pointer ${
-                                   order.status === 'new' ? 'bg-blue-100 text-blue-700' :
-                                   order.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                 <option value="new">Новый</option>
-                                 <option value="processing">В работе</option>
-                                 <option value="shipped">Отправлен</option>
-                                 <option value="delivered">Доставлен</option>
-                                 <option value="cancelled">Отменен</option>
-                              </select>
-                           </div>
-                        </div>
-                     ))}
-                  </div>
-               </div>
-            )}
-            {view === 'customers' && (
-               <div className="animate-fade-in">
-                  <h2 className="text-2xl font-bold mb-4">Клиенты</h2>
-                  <div className="bg-white rounded-xl border border-slate-100 overflow-hidden overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[500px]">
-                       <thead className="bg-slate-50 text-slate-500">
-                          <tr>
-                             <th className="p-4">Имя</th>
-                             <th className="p-4">Телефон</th>
-                             <th className="p-4">Заказов</th>
-                             <th className="p-4">Сумма</th>
-                             <th className="p-4">Статус</th>
-                          </tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-100">
-                          {customers.map(c => (
-                             <tr key={c.id}>
-                                <td className="p-4 font-bold">{c.name}</td>
-                                <td className="p-4 text-slate-500">{c.phone}</td>
-                                <td className="p-4">{c.ordersCount}</td>
-                                <td className="p-4 font-bold text-green-600">{c.totalSpent} с.</td>
-                                <td className="p-4">
-                                   <span className={`px-2 py-1 rounded text-xs font-bold ${c.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                      {c.status}
-                                   </span>
-                                </td>
-                             </tr>
-                          ))}
-                       </tbody>
-                    </table>
-                  </div>
-               </div>
-            )}
-            {view === 'categories' && <CategoriesView />}
-            {view === 'suppliers' && <SuppliersView />}
-            {view === 'finance' && <FinanceView />}
-            {view === 'inventory' && <InventoryView />}
-            {view === 'employees' && <EmployeesView />}
-            {view === 'marketing' && <MarketingView />}
-            {view === 'coupons' && <CouponsView />}
-            {view === 'support' && <SupportView />}
-            {view === 'reviews' && <ReviewsView />}
-            {view === 'media' && <MediaView />}
-            {view === 'logs' && <LogsView />}
-            {view === 'settings' && <SettingsView />}
-         </main>
-      </div>
+         <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+            {renderContent()}
+         </div>
+      </main>
     </div>
   );
 };
