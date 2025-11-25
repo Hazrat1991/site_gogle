@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Icon } from "@iconify/react";
 import { Product, CartItem, Language, Order, Customer, Category, UserProfile, EmployeeExtended, Shift, StaffFinancialRecord, FittingBooking, Supplier } from './types';
@@ -20,7 +19,6 @@ import { CompareDrawer } from './components/CompareDrawer';
 import { LookbookView } from './components/LookbookView';
 import { FittingRoomModal } from './components/FittingRoomModal';
 import { VendorRegistrationModal } from './components/VendorRegistrationModal';
-import { FitFinderModal } from './components/FitFinderModal';
 import { GreetingHeader, FlashSale, DailyBonus, BrandWall, MasonryGrid, OccasionList, LiveTicker } from './components/HomeWidgets';
 import { CategoryHero, SkeletonGrid, InFeedBanner } from './components/ListingWidgets';
 import { CartView } from './components/CartView';
@@ -28,6 +26,8 @@ import { FavoritesView } from './components/FavoritesView';
 import { ProfileView } from './components/ProfileView';
 import { LoginView } from './components/LoginView'; 
 import { QuickViewModal } from './components/QuickViewModal'; 
+import { DailySpin } from './components/DailySpin';
+import { PrimeModal } from './components/PrimeModal';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
@@ -54,6 +54,9 @@ const App: React.FC = () => {
   // Quick View State
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null); 
 
+  // New Modules State
+  const [isPrimeOpen, setIsPrimeOpen] = useState(false);
+
   // Logic for Recently Viewed
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<number[]>([]);
 
@@ -79,9 +82,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (cart.length > 0) {
       const timer = setTimeout(() => {
-        // Only trigger if still in cart logic (simplified)
         addToast('💬 WhatsApp: "Вы забыли товары! Скидка 5% по коду COMEBACK5"', 'info');
-      }, 60000); // 1 minute simulation for demo (instead of 1 hour)
+      }, 60000); // 1 minute simulation
       return () => clearTimeout(timer);
     }
   }, [cart.length]);
@@ -235,12 +237,10 @@ const App: React.FC = () => {
   }, [cart]);
 
   const handlePlaceOrder = (data: any) => {
-    // If referral code used
     if (data.referralCode && data.referralCode.length > 3) {
         addToast(`Скидка 5% по коду ${data.referralCode} применена!`, 'success');
     }
 
-    // Generate verification code for delivery
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) - bundleSavings;
@@ -254,14 +254,13 @@ const App: React.FC = () => {
        total: total,
        status: 'new',
        shippingMethod: 'delivery',
-       // Add pending items with department info
        items: cart.map(item => ({
           ...item,
           pickedStatus: 'pending'
        })),
        referralCodeUsed: data.referralCode,
        verificationCode: verificationCode,
-       tableId: 'Стол 1' // Default table assignment logic would go here
+       tableId: 'Стол 1'
     };
 
     setOrders([newOrder, ...orders]);
@@ -269,6 +268,14 @@ const App: React.FC = () => {
     setIsCheckoutOpen(false);
     addToast(`Заказ оформлен! Ваш код получения: ${verificationCode}`, 'success');
     setTimeout(() => setView({ name: 'profile' }), 1500);
+  };
+
+  // Option C: Client Confirm Delivery
+  const handleClientConfirmDelivery = (orderId: string) => {
+     setOrders(prevOrders => prevOrders.map(o => 
+        o.id === orderId ? { ...o, status: 'delivered', clientConfirmed: true } : o
+     ));
+     addToast('Спасибо! Мы рады, что вы получили заказ.', 'success');
   };
 
   const handleFittingBooking = (date: string, time: string) => {
@@ -322,7 +329,14 @@ const App: React.FC = () => {
     setTimeout(() => setIsListingLoading(false), 800);
   };
 
-  // Complex Filtering Logic
+  const handleWinSpin = (prize: string) => {
+     addToast(`Поздравляем! Вы выиграли: ${prize}`, 'success');
+     if (prize.includes('баллов')) {
+        const pts = parseInt(prize.split(' ')[0]);
+        setUserProfile({...userProfile, bonusPoints: userProfile.bonusPoints + pts});
+     }
+  };
+
   const filteredProducts = useMemo(() => {
     let res = products;
     if (filters.category !== 'all') {
@@ -678,7 +692,6 @@ const App: React.FC = () => {
         onToggleFavorite={toggleFavorite}
         onAddToWaitlist={handleAddToWaitlist}
       />
-      <FitFinderModal isOpen={false} onClose={() => {}} productCategory="" /> 
     </>
     );
   }
@@ -688,7 +701,18 @@ const App: React.FC = () => {
   }
 
   if (view.name === 'employee_portal') {
-    return <div className="h-screen bg-slate-50 dark:bg-slate-950 flex flex-col"><EmployeePortal onBack={() => setView({ name: 'profile' })} employees={employees} shifts={shifts} onClockIn={handleClockIn} onClockOut={handleClockOut} financialRecords={financialRecords} /></div>;
+    return (
+        <div className="h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+            <EmployeePortal 
+                onBack={() => setView({ name: 'profile' })} 
+                employees={employees} 
+                shifts={shifts} 
+                onClockIn={handleClockIn} 
+                onClockOut={handleClockOut} 
+                financialRecords={financialRecords} 
+            />
+        </div>
+    );
   }
 
   if (view.name === 'admin') {
@@ -714,19 +738,31 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-background font-sans overflow-hidden">
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
       <ToastContainer messages={toasts} removeToast={removeToast} />
+      
+      <DailySpin onWin={handleWinSpin} />
+      
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} totalAmount={cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) - bundleSavings} itemCount={cart.reduce((acc, item) => acc + item.quantity, 0)} onSubmit={handlePlaceOrder} savedViaBundles={bundleSavings} />
       <FilterDrawer isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)} onApply={setFilters} currentFilters={filters} lang={lang} />
       <CompareDrawer isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} products={compareList} onRemove={(id) => setCompareList(prev => prev.filter(p => p.id !== id))} onAddToCart={addToCart} />
       <FittingRoomModal isOpen={isFittingModalOpen} onClose={() => setIsFittingModalOpen(false)} onSubmit={handleFittingBooking} itemCount={cart.length} />
       <VendorRegistrationModal isOpen={isVendorModalOpen} onClose={() => setIsVendorModalOpen(false)} onSubmit={handleVendorRegister} />
-      
       <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={addToCart} />
+      
+      <PrimeModal isOpen={isPrimeOpen} onClose={() => setIsPrimeOpen(false)} onSubscribe={() => addToast('Добро пожаловать в Grand Prime!', 'success')} />
 
       {compareList.length > 0 && !isCompareOpen && view.name !== 'admin' && view.name !== 'employee_portal' && (
          <button onClick={() => setIsCompareOpen(true)} className="fixed bottom-24 right-4 z-40 bg-primary text-white p-4 rounded-full shadow-xl flex items-center justify-center gap-2 animate-bounce"><Icon icon="solar:scale-bold" className="size-6" /><span className="font-bold text-xs">{compareList.length}</span></button>
       )}
 
-      {(view.name === 'home' || view.name === 'listing') && <TopHeader onSearch={(q) => { setFilters({...filters, search: q}); setView({ name: 'listing' }); }} onFilterClick={() => setIsFilterOpen(true)} lang={lang} setLang={setLang} />}
+      {(view.name === 'home' || view.name === 'listing') && (
+         <TopHeader 
+            onSearch={(q) => { setFilters({...filters, search: q}); setView({ name: 'listing' }); }} 
+            onFilterClick={() => setIsFilterOpen(true)} 
+            lang={lang} 
+            setLang={setLang} 
+            onBarcodeScan={() => addToast('Сканер штрих-кода запущен...', 'info')}
+         />
+      )}
 
       {view.name === 'home' && renderHome()}
       {view.name === 'listing' && renderListing()}
@@ -752,6 +788,8 @@ const App: React.FC = () => {
           onNavigate={setView}
           isDarkMode={isDarkMode}
           onToggleTheme={toggleDarkMode}
+          onOpenPrime={() => setIsPrimeOpen(true)}
+          onConfirmDelivery={handleClientConfirmDelivery}
         />
       )}
       

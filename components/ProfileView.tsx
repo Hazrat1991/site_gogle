@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Icon } from "@iconify/react";
 import { UserProfile, Order } from '../types';
@@ -11,6 +10,8 @@ interface ProfileViewProps {
   onNavigate: (view: any) => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  onOpenPrime?: () => void;
+  onConfirmDelivery?: (orderId: string) => void; // NEW prop
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ 
@@ -18,7 +19,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   orders, 
   onNavigate, 
   isDarkMode, 
-  onToggleTheme 
+  onToggleTheme,
+  onOpenPrime,
+  onConfirmDelivery
 }) => {
   // Logic for Active Order
   const activeOrder = orders.find(o => ['new', 'processing', 'shipped', 'ready_to_ship'].includes(o.status));
@@ -111,6 +114,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
          </div>
       </div>
 
+      {/* Prime Banner - NEW */}
+      <div className="px-4 mt-6" onClick={onOpenPrime}>
+         <div className="bg-slate-900 dark:bg-black p-4 rounded-2xl shadow-lg cursor-pointer flex items-center justify-between relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-800 to-slate-900 group-hover:scale-105 transition-transform duration-700"></div>
+            <div className="relative z-10 flex items-center gap-4">
+               <div className="size-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Icon icon="solar:crown-bold" className="text-white size-6" />
+               </div>
+               <div>
+                  <h3 className="text-white font-bold text-lg leading-none mb-1">Grand Prime</h3>
+                  <p className="text-slate-400 text-xs">Бесплатная доставка и кэшбек</p>
+               </div>
+            </div>
+            <div className="relative z-10 bg-white/10 p-2 rounded-full">
+               <Icon icon="solar:alt-arrow-right-bold" className="text-white" />
+            </div>
+         </div>
+      </div>
+
       {/* Active Order Widget */}
       {activeOrder && (
          <div className="px-4 mt-6">
@@ -135,13 +157,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   )}
                </div>
                
-               {/* Verification Code Display */}
-               {(activeOrder.status === 'shipped' || activeOrder.status === 'ready_to_ship') && activeOrder.verificationCode && (
-                  <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl mb-4 text-center border border-dashed border-slate-300 dark:border-slate-700">
-                     <p className="text-xs text-slate-500 mb-1">Код для курьера:</p>
-                     <div className="text-2xl font-mono font-black text-slate-900 dark:text-white tracking-widest">
-                        {activeOrder.verificationCode}
+               {/* Verification Code Display & Confirmation Button */}
+               {(activeOrder.status === 'shipped' || activeOrder.status === 'ready_to_ship') && (
+                  <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl mb-4 border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center gap-3">
+                     <div className="text-center w-full">
+                        <p className="text-xs text-slate-500 mb-1">Код для курьера:</p>
+                        <div className="text-3xl font-mono font-black text-slate-900 dark:text-white tracking-[0.2em] w-full text-center">
+                           {activeOrder.verificationCode}
+                        </div>
                      </div>
+                     
+                     {activeOrder.status === 'shipped' && onConfirmDelivery && (
+                        <button 
+                           onClick={() => onConfirmDelivery(activeOrder.id)}
+                           className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                           <Icon icon="solar:check-circle-bold" className="size-5" />
+                           Я получил заказ
+                        </button>
+                     )}
                   </div>
                )}
                

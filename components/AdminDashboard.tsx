@@ -1,6 +1,5 @@
 
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Icon } from "@iconify/react";
 import { Product, Order, Customer, Category, Department, StoreSettings, Supplier, EmployeeExtended, Shift, StaffFinancialRecord, FittingBooking, MediaItem, ActivityLog, PackingTable, WarehouseDocument, Review, SupportChat, PayoutRequest, StaticPage, DeliveryZone, NotificationCampaign, Attribute, AdminUser } from '../types';
 import { MOCK_DEPARTMENTS, MOCK_SETTINGS, MOCK_SUPPLIERS, MOCK_LOGS, MOCK_MEDIA_FILES, MOCK_CATEGORIES, MOCK_PACKING_TABLES, MOCK_WAREHOUSE_DOCUMENTS, MOCK_PENDING_REVIEWS, MOCK_SUPPORT_CHATS, MOCK_PAYOUTS, MOCK_PAGES, MOCK_ZONES, MOCK_NOTIFICATIONS, MOCK_ATTRIBUTES, MOCK_ADMIN_USERS } from '../constants';
@@ -30,170 +29,738 @@ interface AdminDashboardProps {
   setSuppliers?: (s: Supplier[]) => void;
 }
 
-// --- RESTORED & NEW VIEWS ---
-
-const OverviewView: React.FC<{ products: Product[], orders: Order[], customers: Customer[] }> = ({ products, orders, customers }) => {
-  const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
-  const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0);
-  const outOfStock = products.filter(p => (p.stock || 0) === 0).length;
+// --- HELPER FOR CHARTS ---
+const SimpleLineChart = ({ data, color = '#F97316', height = 60 }: { data: number[], color?: string, height?: number }) => {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const stepX = 100 / (data.length - 1);
+  
+  const points = data.map((val, i) => {
+    const x = i * stepX;
+    // Normalize y (0 at bottom, 100 at top)
+    const y = 100 - ((val - min) / range) * 100; 
+    return `${x},${y}`;
+  }).join(' ');
 
   return (
-    <div className="space-y-6 animate-fade-in">
-       <h2 className="text-2xl font-bold mb-6">Обзор</h2>
-       
-       {/* Stats Cards */}
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-             <div className="size-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
-                <Icon icon="solar:wallet-money-bold" className="size-6" />
-             </div>
-             <div>
-                <div className="text-slate-400 text-xs font-bold uppercase">Продажи</div>
-                <div className="text-2xl font-bold text-slate-800">{totalSales.toLocaleString()} c.</div>
-             </div>
-          </div>
-          
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-             <div className="size-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                <Icon icon="solar:bag-check-bold" className="size-6" />
-             </div>
-             <div>
-                <div className="text-slate-400 text-xs font-bold uppercase">Заказы</div>
-                <div className="text-2xl font-bold text-slate-800">{orders.length}</div>
-             </div>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full" style={{ height }}>
+      <polyline 
+         fill="none" 
+         stroke={color} 
+         strokeWidth="2" 
+         points={points} 
+         vectorEffect="non-scaling-stroke"
+         strokeLinecap="round" 
+         strokeLinejoin="round"
+      />
+      <defs>
+        <linearGradient id={`grad-${color}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon 
+         fill={`url(#grad-${color})`} 
+         points={`0,100 ${points} 100,100`} 
+      />
+    </svg>
+  );
+};
+
+// --- PRODUCT FORM COMPONENT ---
+
+const ProductForm: React.FC<{ 
+  product?: Product | null, 
+  onSave: (p: Product) => void, 
+  onCancel: () => void,
+  categories: Category[],
+  suppliers: Supplier[]
+}> = ({ product, onSave, onCancel, categories, suppliers }) => {
+  const [formData, setFormData] = useState<Partial<Product>>({
+    name: '',
+    description: '',
+    price: 0,
+    buyPrice: 0,
+    oldPrice: 0,
+    stock: 0,
+    category: categories[0]?.id || 'men',
+    subCategory: '',
+    images: [''],
+    isNew: true,
+    isTop: false,
+    supplierId: suppliers[0]?.id || '',
+    material: ''
+  });
+
+  useEffect(() => {
+    if (product) {
+      setFormData(product);
+    }
+  }, [product]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newProduct = {
+      ...formData,
+      id: product?.id || Math.floor(Math.random() * 10000),
+      rating: product?.rating || 0,
+      reviews: product?.reviews || [],
+      colors: product?.colors || ['Черный'],
+      sizes: product?.sizes || ['M', 'L'],
+      images: formData.images?.filter(i => i) || []
+    } as Product;
+    onSave(newProduct);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+             <h3 className="text-xl font-bold text-slate-800">
+               {product ? 'Редактирование товара' : 'Новый товар'}
+             </h3>
+             <button onClick={onCancel} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm">
+                <Icon icon="solar:close-circle-bold" className="size-6" />
+             </button>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-             <div className="size-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
-                <Icon icon="solar:users-group-rounded-bold" className="size-6" />
-             </div>
-             <div>
-                <div className="text-slate-400 text-xs font-bold uppercase">Клиенты</div>
-                <div className="text-2xl font-bold text-slate-800">{customers.length}</div>
-             </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-             <div className="size-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
-                <Icon icon="solar:t-shirt-bold" className="size-6" />
-             </div>
-             <div>
-                <div className="text-slate-400 text-xs font-bold uppercase">Товары</div>
-                <div className="text-2xl font-bold text-slate-800">{products.length}</div>
-             </div>
-          </div>
-       </div>
-
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Orders */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <h3 className="font-bold text-lg mb-4">Последние заказы</h3>
-             <div className="space-y-4">
-                {orders.slice(0, 4).map(order => (
-                   <div key={order.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-3">
-                         <div className="size-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase">
-                            {order.customerName?.[0] || 'G'}
+          {/* Form Body */}
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+             <form id="product-form" onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Main Info */}
+                <div className="lg:col-span-2 space-y-6">
+                   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                         <Icon icon="solar:document-text-bold" className="text-primary" />
+                         Основная информация
+                      </h4>
+                      <div className="space-y-4">
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Название товара</label>
+                            <input required type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Напр: Куртка зимняя" />
                          </div>
                          <div>
-                            <div className="font-bold text-slate-800">{order.customerName || 'Гость'}</div>
-                            <div className="text-xs text-slate-400">Заказ {order.id}</div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Описание</label>
+                            <textarea rows={4} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Детальное описание..." />
                          </div>
                       </div>
-                      <div className="text-right">
-                         <div className="font-bold text-primary mb-1">{order.total} c.</div>
-                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                            order.status === 'new' ? 'bg-green-100 text-green-600' :
-                            order.status === 'delivered' ? 'bg-slate-100 text-slate-600' :
-                            'bg-orange-100 text-orange-600'
-                         }`}>{order.status}</span>
+                   </div>
+
+                   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                         <Icon icon="solar:gallery-bold" className="text-blue-600" />
+                         Медиа
+                      </h4>
+                      <div className="space-y-3">
+                         <label className="block text-xs font-bold text-slate-500">Ссылки на изображения</label>
+                         {formData.images?.map((img, idx) => (
+                            <div key={idx} className="flex gap-2">
+                               <input type="text" className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl" value={img} onChange={e => {
+                                  const newImages = [...(formData.images || [])];
+                                  newImages[idx] = e.target.value;
+                                  setFormData({...formData, images: newImages});
+                               }} placeholder="https://..." />
+                               {img && <img src={img} className="size-12 rounded-lg object-cover bg-slate-100 border border-slate-200" />}
+                            </div>
+                         ))}
+                         <button type="button" onClick={() => setFormData({...formData, images: [...(formData.images || []), '']})} className="text-sm font-bold text-primary hover:underline">
+                            + Добавить фото
+                         </button>
                       </div>
                    </div>
-                ))}
-             </div>
+
+                   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                         <Icon icon="solar:tag-price-bold" className="text-green-600" />
+                         Цены и Склад
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Цена продажи (с.)</label>
+                            <input required type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Старая цена (с.)</label>
+                            <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.oldPrice || ''} onChange={e => setFormData({...formData, oldPrice: Number(e.target.value)})} />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Закупочная цена (с.)</label>
+                            <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.buyPrice || ''} onChange={e => setFormData({...formData, buyPrice: Number(e.target.value)})} />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Остаток на складе</label>
+                            <input required type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold" value={formData.stock} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} />
+                         </div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Right Column: Settings */}
+                <div className="space-y-6">
+                   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-4">Классификация</h4>
+                      <div className="space-y-4">
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Категория</label>
+                            <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                         </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Подкатегория</label>
+                            <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.subCategory} onChange={e => setFormData({...formData, subCategory: e.target.value})} />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Поставщик</label>
+                            <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId: e.target.value})}>
+                               <option value="">Без поставщика</option>
+                               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-4">Метки</h4>
+                      <div className="space-y-3">
+                         <label className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-50">
+                            <input type="checkbox" className="size-5 accent-primary" checked={formData.isNew} onChange={e => setFormData({...formData, isNew: e.target.checked})} />
+                            <span className="font-medium text-sm">Новинка (New)</span>
+                         </label>
+                         <label className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl cursor-pointer hover:bg-slate-50">
+                            <input type="checkbox" className="size-5 accent-primary" checked={formData.isTop} onChange={e => setFormData({...formData, isTop: e.target.checked})} />
+                            <span className="font-medium text-sm">Хит продаж (Top)</span>
+                         </label>
+                      </div>
+                   </div>
+                </div>
+             </form>
           </div>
 
-          {/* Stock Status */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
-             <h3 className="font-bold text-lg mb-4">Статус склада</h3>
-             <div className="space-y-4 mb-6">
-                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                   <span className="text-slate-500 text-sm font-medium">Всего товаров</span>
-                   <span className="font-bold text-slate-800">{products.length}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                   <span className="text-slate-500 text-sm font-medium">Общий остаток</span>
-                   <span className="font-bold text-slate-800">{totalStock} шт.</span>
-                </div>
-                <div className="flex justify-between items-center pb-2">
-                   <span className="text-slate-500 text-sm font-medium">Товаров без остатка</span>
-                   <span className="font-bold text-red-500">{outOfStock}</span>
-                </div>
-             </div>
-             
-             {outOfStock > 0 && (
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-3">
-                   <Icon icon="solar:info-circle-bold" className="text-orange-500 size-5 shrink-0" />
-                   <p className="text-xs text-orange-700 leading-relaxed font-medium">
-                      {outOfStock} товара заканчиваются. Рекомендуем пополнить запасы в категории "Обувь".
-                   </p>
-                </div>
-             )}
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3">
+             <button onClick={onCancel} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">Отмена</button>
+             <button form="product-form" type="submit" className="px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30">
+                {product ? 'Сохранить изменения' : 'Создать товар'}
+             </button>
           </div>
        </div>
     </div>
   );
 };
 
-const ProductsView: React.FC<{ products: Product[], setProducts: (p: Product[]) => void }> = ({ products, setProducts }) => (
-  <div className="space-y-4 animate-fade-in">
-    <div className="flex justify-between items-center">
-       <h2 className="text-2xl font-bold">Товары</h2>
-       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-          <Icon icon="solar:add-circle-bold" />
-          Добавить товар
-       </button>
+// --- VIEW COMPONENTS ---
+
+const OverviewView: React.FC<{ products: Product[], orders: Order[], customers: Customer[], employees: EmployeeExtended[] }> = ({ products, orders, customers, employees }) => {
+  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
+
+  // --- LOGIC FOR KPIS & CHARTS ---
+  // In a real app, these would be calculated from backend data with real dates.
+  // Here we simulate values based on timeRange for demonstration.
+  
+  const multiplier = timeRange === 'day' ? 1 : timeRange === 'week' ? 5 : 20;
+  
+  const stats = {
+     revenue: 15400 * multiplier,
+     revenueGrowth: 12,
+     ordersCount: 24 * multiplier,
+     avgCheck: Math.round(15400 / 24),
+     profit: (15400 * 0.35) * multiplier, // Assuming 35% margin
+     profitGrowth: 8,
+  };
+
+  // Mock data for charts
+  const salesData = timeRange === 'day' 
+     ? [1200, 2400, 1800, 3200, 4500, 2100, 15400] // Hourly-ish
+     : timeRange === 'week'
+     ? [15000, 18000, 12000, 22000, 25000, 30000, 15400] // Daily
+     : [120000, 150000, 180000, 200000]; // Weekly
+
+  const activeCouriers = employees.filter(e => e.role === 'courier' && e.status === 'working').length;
+  const topProducts = products.filter(p => p.isTop).slice(0, 4);
+  
+  // Action Items Logic
+  const lowStockCount = products.filter(p => (p.stock || 0) < 5).length;
+  const pendingOrders = orders.filter(o => o.status === 'new' || o.status === 'processing').length;
+  const returnsCount = 2; // Mock
+
+  const KPICard = ({ title, value, subtext, icon, color, bg, chartData }: any) => (
+     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden flex flex-col justify-between h-full">
+        <div className="flex justify-between items-start mb-2">
+           <div className={`size-10 rounded-xl ${bg} ${color} flex items-center justify-center`}>
+              <Icon icon={icon} className="size-5" />
+           </div>
+           {subtext && (
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${subtext.includes('+') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                 {subtext}
+              </span>
+           )}
+        </div>
+        <div>
+           <div className="text-slate-400 text-xs font-bold uppercase mb-1">{title}</div>
+           <div className="text-2xl font-black text-slate-800">{value}</div>
+        </div>
+        {chartData && (
+           <div className="absolute bottom-0 right-0 w-1/2 h-12 opacity-20">
+              <SimpleLineChart data={chartData} color={color.replace('text-', '').replace('-600', '') === 'green' ? '#16a34a' : '#F97316'} />
+           </div>
+        )}
+     </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-10">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+             <h2 className="text-2xl font-bold text-slate-800">Обзор</h2>
+             <p className="text-sm text-slate-500">Сводка ключевых показателей эффективности</p>
+          </div>
+          <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+             {['day', 'week', 'month'].map((r) => (
+                <button 
+                   key={r}
+                   onClick={() => setTimeRange(r as any)}
+                   className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      timeRange === r ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                   }`}
+                >
+                   {r === 'day' ? 'Сегодня' : r === 'week' ? 'Неделя' : 'Месяц'}
+                </button>
+             ))}
+          </div>
+       </div>
+       
+       {/* 1. KPI Grid */}
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard 
+             title="Выручка" 
+             value={`${stats.revenue.toLocaleString()} с.`} 
+             subtext={`+${stats.revenueGrowth}%`} 
+             icon="solar:wallet-money-bold" 
+             color="text-green-600" bg="bg-green-50"
+             chartData={salesData}
+          />
+          <KPICard 
+             title="Заказы" 
+             value={stats.ordersCount} 
+             subtext="+5" 
+             icon="solar:bag-check-bold" 
+             color="text-blue-600" bg="bg-blue-50"
+          />
+          <KPICard 
+             title="Чистая прибыль" 
+             value={`${Math.round(stats.profit).toLocaleString()} с.`} 
+             subtext={`+${stats.profitGrowth}%`} 
+             icon="solar:chart-square-bold" 
+             color="text-purple-600" bg="bg-purple-50"
+          />
+          <KPICard 
+             title="Средний чек" 
+             value={`${stats.avgCheck} с.`} 
+             subtext="-2%" 
+             icon="solar:bill-list-bold" 
+             color="text-orange-600" bg="bg-orange-50"
+          />
+       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 2. Main Chart Area */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-lg text-slate-800">Динамика продаж</h3>
+                <button className="text-slate-400 hover:text-primary"><Icon icon="solar:menu-dots-bold" /></button>
+             </div>
+             <div className="h-64 w-full flex items-end gap-2">
+                {/* Simple Bar Chart Simulation */}
+                {salesData.map((val, i) => {
+                   const height = (val / Math.max(...salesData)) * 100;
+                   return (
+                      <div key={i} className="flex-1 flex flex-col justify-end group cursor-pointer">
+                         <div className="text-[10px] text-center text-slate-500 opacity-0 group-hover:opacity-100 mb-1 font-bold">{val}</div>
+                         <div 
+                           className="w-full bg-primary/80 rounded-t-lg hover:bg-primary transition-all relative"
+                           style={{ height: `${height}%` }}
+                         ></div>
+                      </div>
+                   )
+                })}
+             </div>
+             <div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase">
+                {timeRange === 'day' 
+                   ? ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00'].map(t => <span key={t}>{t}</span>)
+                   : ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(t => <span key={t}>{t}</span>)
+                }
+             </div>
+          </div>
+
+          {/* 3. Action Center & Alerts */}
+          <div className="space-y-6">
+             {/* Action Needed */}
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-red-600">
+                   <Icon icon="solar:bell-bing-bold" />
+                   Требует внимания
+                </h3>
+                <div className="space-y-3">
+                   <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+                      <div className="flex items-center gap-3">
+                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm">
+                            <Icon icon="solar:box-bold" />
+                         </div>
+                         <span className="text-sm font-bold text-slate-700">Новые заказы</span>
+                      </div>
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-bold">{pendingOrders}</span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-3 bg-red-50 rounded-xl border border-red-100">
+                      <div className="flex items-center gap-3">
+                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-red-600 shadow-sm">
+                            <Icon icon="solar:danger-circle-bold" />
+                         </div>
+                         <span className="text-sm font-bold text-slate-700">Заканчивается</span>
+                      </div>
+                      <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{lowStockCount}</span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
+                      <div className="flex items-center gap-3">
+                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-orange-600 shadow-sm">
+                            <Icon icon="solar:restart-bold" />
+                         </div>
+                         <span className="text-sm font-bold text-slate-700">Возвраты</span>
+                      </div>
+                      <span className="bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{returnsCount}</span>
+                   </div>
+                </div>
+             </div>
+
+             {/* Logistics Status */}
+             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-lg mb-4">Логистика</h3>
+                <div className="flex items-center justify-between mb-4">
+                   <div className="text-sm text-slate-500">Активных курьеров</div>
+                   <div className="font-bold text-slate-800 flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-green-500 animate-pulse"></span>
+                      {activeCouriers} чел.
+                   </div>
+                </div>
+                <div className="bg-slate-100 rounded-xl p-4 text-center">
+                   <div className="text-2xl font-black text-slate-800 mb-1">12 мин</div>
+                   <div className="text-xs text-slate-500 font-bold uppercase">Среднее время доставки</div>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       {/* 4. Recent Lists Grid */}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">Последние заказы</h3>
+                <button className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">Все заказы</button>
+             </div>
+             <div className="space-y-3">
+                {orders.slice(0, 4).map(order => (
+                   <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                         <div className="size-10 rounded-full bg-white flex items-center justify-center font-bold text-slate-500 text-xs shadow-sm">
+                            {order.id.slice(-3)}
+                         </div>
+                         <div>
+                            <div className="font-bold text-slate-800 text-sm">{order.customerName}</div>
+                            <div className="text-[10px] text-slate-400">{order.items.length} товаров • {order.date}</div>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <div className="font-bold text-slate-800 text-sm">{order.total} c.</div>
+                         <div className={`text-[10px] font-bold uppercase ${
+                            order.status === 'new' ? 'text-blue-600' : 
+                            order.status === 'delivered' ? 'text-green-600' : 'text-orange-600'
+                         }`}>{order.status}</div>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+             <h3 className="font-bold text-lg mb-4">Топ товары</h3>
+             <div className="space-y-4">
+                {topProducts.map((p, i) => (
+                   <div key={p.id} className="flex items-center gap-3 border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                      <div className="size-6 bg-slate-800 text-white rounded-lg flex items-center justify-center text-[10px] font-bold">{i + 1}</div>
+                      <img src={p.images[0]} className="size-12 rounded-lg object-cover bg-slate-100" />
+                      <div className="flex-1 min-w-0">
+                         <div className="text-sm font-bold text-slate-800 truncate">{p.name}</div>
+                         <div className="text-xs text-slate-400">Остаток: {p.stock} шт.</div>
+                      </div>
+                      <div className="text-right">
+                         <div className="text-sm font-bold text-green-600">{p.price} с.</div>
+                         <div className="text-[10px] text-slate-400">{Math.floor(Math.random() * 50) + 10} продаж</div>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+       </div>
     </div>
-    
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-      <table className="w-full text-left text-sm min-w-[800px]">
-         <thead className="bg-slate-50 text-slate-500">
-            <tr>
-               <th className="p-4">Фото</th>
-               <th className="p-4">Название</th>
-               <th className="p-4">Категория</th>
-               <th className="p-4">Цена</th>
-               <th className="p-4">Остаток</th>
-               <th className="p-4">Статус</th>
-               <th className="p-4">Действия</th>
-            </tr>
-         </thead>
-         <tbody className="divide-y divide-slate-100">
-            {products.map(p => (
-               <tr key={p.id} className="hover:bg-slate-50">
-                  <td className="p-4">
-                     <img src={p.images[0]} className="size-10 rounded-lg object-cover bg-slate-100" />
-                  </td>
-                  <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                  <td className="p-4 text-slate-500 capitalize">{p.category}</td>
-                  <td className="p-4 font-bold">{p.price} с.</td>
-                  <td className={`p-4 font-bold ${p.stock && p.stock < 5 ? 'text-red-500' : 'text-slate-800'}`}>{p.stock} шт.</td>
-                  <td className="p-4">
-                     <span className={`px-2 py-1 rounded text-xs font-bold ${p.stock && p.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {p.stock && p.stock > 0 ? 'В наличии' : 'Нет в наличии'}
-                     </span>
-                  </td>
-                  <td className="p-4 flex gap-2">
-                     <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-500"><Icon icon="solar:pen-bold" /></button>
-                     <button className="p-2 hover:bg-red-100 rounded-lg text-red-500"><Icon icon="solar:trash-bin-trash-bold" /></button>
-                  </td>
-               </tr>
-            ))}
-         </tbody>
-      </table>
-    </div>
-  </div>
-);
+  );
+};
+
+const ProductsView: React.FC<{ 
+  products: Product[], 
+  setProducts: (p: Product[]) => void, 
+  categories: Category[], 
+  suppliers: Supplier[] 
+}> = ({ products, setProducts, categories, suppliers }) => {
+   const [searchQuery, setSearchQuery] = useState('');
+   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+   const [filterCategory, setFilterCategory] = useState('all');
+   const [filterStatus, setFilterStatus] = useState('all');
+   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+   const [isFormOpen, setIsFormOpen] = useState(false);
+
+   // KPIs
+   const totalProducts = products.length;
+   const totalValue = products.reduce((acc, p) => acc + (p.price * (p.stock || 0)), 0);
+   const lowStockCount = products.filter(p => (p.stock || 0) < 5).length;
+   
+   // Computed Products
+   const filteredProducts = useMemo(() => {
+      let result = products;
+      if (searchQuery) {
+         const q = searchQuery.toLowerCase();
+         result = result.filter(p => p.name.toLowerCase().includes(q) || String(p.id).includes(q));
+      }
+      if (filterCategory !== 'all') {
+         result = result.filter(p => p.category === filterCategory);
+      }
+      if (filterStatus === 'in_stock') {
+         result = result.filter(p => (p.stock || 0) > 0);
+      } else if (filterStatus === 'out_of_stock') {
+         result = result.filter(p => (p.stock || 0) === 0);
+      }
+      return result;
+   }, [products, searchQuery, filterCategory, filterStatus]);
+
+   const toggleSelect = (id: number) => {
+      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+   };
+
+   const toggleSelectAll = () => {
+      if (selectedIds.length === filteredProducts.length) {
+         setSelectedIds([]);
+      } else {
+         setSelectedIds(filteredProducts.map(p => p.id));
+      }
+   };
+
+   const handleDeleteSelected = () => {
+      if (confirm(`Удалить ${selectedIds.length} товаров?`)) {
+         setProducts(products.filter(p => !selectedIds.includes(p.id)));
+         setSelectedIds([]);
+      }
+   };
+
+   const handleSaveProduct = (product: Product) => {
+      if (editingProduct) {
+         setProducts(products.map(p => p.id === product.id ? product : p));
+      } else {
+         setProducts([product, ...products]);
+      }
+      setIsFormOpen(false);
+      setEditingProduct(null);
+   };
+
+   const KPICard = ({ icon, title, value, color, bg }: any) => (
+      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+         <div className={`size-12 rounded-xl flex items-center justify-center ${bg} ${color}`}>
+            <Icon icon={icon} className="size-6" />
+         </div>
+         <div>
+            <div className="text-xs font-bold text-slate-400 uppercase">{title}</div>
+            <div className="text-2xl font-black text-slate-800">{value}</div>
+         </div>
+      </div>
+   );
+
+   return (
+      <div className="space-y-6 animate-fade-in pb-10">
+         {isFormOpen && (
+            <ProductForm 
+               product={editingProduct} 
+               onSave={handleSaveProduct} 
+               onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }}
+               categories={categories}
+               suppliers={suppliers}
+            />
+         )}
+
+         {/* 1. KPI Cards */}
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard icon="solar:t-shirt-bold" title="Всего товаров" value={totalProducts} color="text-blue-600" bg="bg-blue-50" />
+            <KPICard icon="solar:wallet-money-bold" title="На складе (Цена)" value={`${(totalValue / 1000).toFixed(1)}k c.`} color="text-green-600" bg="bg-green-50" />
+            <KPICard icon="solar:danger-circle-bold" title="Низкий остаток" value={lowStockCount} color="text-red-500" bg="bg-red-50" />
+            <KPICard icon="solar:layers-bold" title="Категорий" value={categories.length} color="text-purple-600" bg="bg-purple-50" />
+         </div>
+
+         {/* 2. Toolbar */}
+         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+               <div className="relative group w-full md:w-64">
+                  <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
+                  <input 
+                     type="text" 
+                     placeholder="Название, артикул..." 
+                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary transition-all"
+                     value={searchQuery}
+                     onChange={e => setSearchQuery(e.target.value)}
+                  />
+               </div>
+               <select 
+                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:border-primary cursor-pointer"
+                  value={filterCategory}
+                  onChange={e => setFilterCategory(e.target.value)}
+               >
+                  <option value="all">Все категории</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+               </select>
+               <select 
+                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:border-primary cursor-pointer"
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+               >
+                  <option value="all">Любой статус</option>
+                  <option value="in_stock">В наличии</option>
+                  <option value="out_of_stock">Нет в наличии</option>
+               </select>
+            </div>
+            
+            <div className="flex gap-3 w-full md:w-auto">
+               <button 
+                  onClick={() => { setEditingProduct(null); setIsFormOpen(true); }}
+                  className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 hover:bg-primary/90 transition-colors active:scale-95"
+               >
+                  <Icon icon="solar:add-circle-bold" />
+                  Добавить
+               </button>
+            </div>
+         </div>
+
+         {/* 3. Bulk Actions Bar */}
+         {selectedIds.length > 0 && (
+            <div className="bg-slate-900 text-white p-3 rounded-xl flex justify-between items-center animate-fade-in shadow-lg">
+               <div className="flex items-center gap-4 px-2">
+                  <span className="font-bold text-sm">Выбрано: {selectedIds.length}</span>
+                  <div className="h-4 w-px bg-slate-700"></div>
+                  <button className="text-xs font-bold hover:text-slate-300">Изменить статус</button>
+               </div>
+               <button 
+                  onClick={handleDeleteSelected}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"
+               >
+                  <Icon icon="solar:trash-bin-trash-bold" />
+                  Удалить
+               </button>
+            </div>
+         )}
+
+         {/* 4. Products Table */}
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[900px]">
+               <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100">
+                  <tr>
+                     <th className="p-4 w-10">
+                        <input type="checkbox" className="size-4 accent-primary cursor-pointer" checked={selectedIds.length === filteredProducts.length && filteredProducts.length > 0} onChange={toggleSelectAll} />
+                     </th>
+                     <th className="p-4">Товар</th>
+                     <th className="p-4">Цена / Закуп</th>
+                     <th className="p-4 w-48">Склад</th>
+                     <th className="p-4">Категория</th>
+                     <th className="p-4">Поставщик</th>
+                     <th className="p-4">Статус</th>
+                     <th className="p-4 text-right">Действия</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                  {filteredProducts.map(p => {
+                     const isSelected = selectedIds.includes(p.id);
+                     const stock = p.stock || 0;
+                     const maxStock = 20; 
+                     const stockPercent = Math.min(100, (stock / maxStock) * 100);
+                     const stockColor = stock === 0 ? 'bg-slate-200' : stock < 5 ? 'bg-red-500' : 'bg-green-500';
+
+                     return (
+                        <tr key={p.id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                           <td className="p-4">
+                              <input type="checkbox" className="size-4 accent-primary cursor-pointer" checked={isSelected} onChange={() => toggleSelect(p.id)} />
+                           </td>
+                           <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                 <div className="size-12 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                    <img src={p.images[0]} className="w-full h-full object-cover" alt={p.name} />
+                                 </div>
+                                 <div>
+                                    <div className="font-bold text-slate-800 line-clamp-1">{p.name}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: GM-{p.id}</div>
+                                 </div>
+                              </div>
+                           </td>
+                           <td className="p-4">
+                              <div className="font-bold text-slate-800">{p.price} с.</div>
+                              <div className="text-[10px] text-slate-400">Закуп: {p.buyPrice || '-'} с.</div>
+                           </td>
+                           <td className="p-4">
+                              <div className="flex items-center gap-2 mb-1">
+                                 <span className={`text-xs font-bold ${stock < 5 ? 'text-red-500' : 'text-slate-700'}`}>{stock} шт.</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                 <div className={`h-full rounded-full ${stockColor}`} style={{ width: `${stockPercent}%` }}></div>
+                              </div>
+                           </td>
+                           <td className="p-4 text-slate-600 font-medium capitalize">
+                              {p.category}
+                           </td>
+                           <td className="p-4 text-xs text-slate-500">
+                              {suppliers.find(s => s.id === p.supplierId)?.name || 'Собственный'}
+                           </td>
+                           <td className="p-4">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                 {stock > 0 ? 'В наличии' : 'Нет на складе'}
+                              </span>
+                           </td>
+                           <td className="p-4 text-right">
+                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <button 
+                                    onClick={() => { setEditingProduct(p); setIsFormOpen(true); }}
+                                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500"
+                                 >
+                                    <Icon icon="solar:pen-bold" />
+                                 </button>
+                                 <button 
+                                    onClick={() => {
+                                       if(confirm('Удалить товар?')) {
+                                          setProducts(products.filter(pr => pr.id !== p.id));
+                                       }
+                                    }}
+                                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-red-50 text-red-500"
+                                 >
+                                    <Icon icon="solar:trash-bin-trash-bold" />
+                                 </button>
+                              </div>
+                           </td>
+                        </tr>
+                     );
+                  })}
+               </tbody>
+            </table>
+         </div>
+      </div>
+   );
+};
 
 const FinanceView: React.FC = () => (
   <div className="space-y-6 animate-fade-in">
@@ -1122,6 +1689,16 @@ const ACLView: React.FC = () => (
    </div>
 );
 
+const PlaceholderView: React.FC<{ title: string, icon: string }> = ({ title, icon }) => (
+   <div className="flex flex-col items-center justify-center h-[500px] text-slate-400 animate-fade-in">
+      <div className="size-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+         <Icon icon={icon} className="size-10 opacity-50" />
+      </div>
+      <h3 className="text-2xl font-bold text-slate-800 mb-2">{title}</h3>
+      <p className="max-w-md text-center">Раздел находится в разработке</p>
+   </div>
+);
+
 // --- MAIN ADMIN DASHBOARD COMPONENT ---
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -1165,12 +1742,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const renderContent = () => {
     switch(activeView) {
-      case 'overview': return <OverviewView products={products} orders={orders} customers={customers} />;
+      case 'overview': return <OverviewView products={products} orders={orders} customers={customers} employees={employees} />;
       case 'orders': return <KanbanBoard orders={orders} onUpdateStatus={() => {}} />; 
       case 'tables': return <TablesView />; 
       case 'warehouse': return <WarehouseView />; 
       case 'fitting': return <FittingRoomView bookings={bookings} />;
-      case 'products': return <ProductsView products={products} setProducts={setProducts} />;
+      case 'products': return <ProductsView products={products} setProducts={setProducts} categories={categories} suppliers={suppliers} />;
       case 'approval': return <ProductApprovalView products={products} />; // Added
       case 'reviews': return <ReviewsView />; // Added
       case 'support': return <SupportView />; // Added
@@ -1179,7 +1756,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case 'finance': return <FinanceView />;
       case 'payouts': return <PayoutsView />; // Added
       case 'customers': return <CustomersView customers={customers} />;
-      case 'returns': return <div className="text-center p-10 text-slate-400">Возвраты (Демонстрация)</div>;
+      case 'returns': return <PlaceholderView title="Возвраты (RMA)" icon="solar:restart-bold" />;
       case 'shops': return <ShopsView suppliers={suppliers} setSuppliers={setSuppliers} />;
       case 'suppliers_admin': return <SupplierManagementView suppliers={suppliers} setSuppliers={setSuppliers} />;
       case 'employees': return <EmployeeManager employees={employees} setEmployees={setEmployees} shifts={shifts} setShifts={setShifts} financialRecords={financialRecords} setFinancialRecords={setFinancialRecords} />;

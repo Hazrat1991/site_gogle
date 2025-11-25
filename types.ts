@@ -53,6 +53,7 @@ export interface CartItem extends Product {
   bundleDiscountApplied?: number; // New: Amount saved via bundle
   // Fulfillment fields
   pickedStatus?: 'pending' | 'picked'; 
+  departmentId?: string; // Explicitly keep departmentId here for pickers
 }
 
 export interface SavedAddress {
@@ -160,6 +161,7 @@ export interface Order {
   tableId?: string; // Which table acts as assembly point
   verificationCode?: string; // 4-6 digit code for delivery
   courierId?: string;
+  clientConfirmed?: boolean; // Option C: Client confirmed via button
 }
 
 export interface ChatMessage {
