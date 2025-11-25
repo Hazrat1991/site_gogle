@@ -12,6 +12,14 @@ export interface Review {
   productName?: string; // For admin context
 }
 
+export interface Question {
+  id: string;
+  user: string;
+  question: string;
+  answer?: string;
+  date: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -27,6 +35,7 @@ export interface Product {
   colors: string[];
   rating: number;
   reviews: Review[];
+  questions?: Question[]; // NEW: Q&A
   isNew?: boolean;
   isTop?: boolean;
   stock?: number;
@@ -34,6 +43,7 @@ export interface Product {
   crossSellIds?: number[]; // NEW: IDs of products to recommend
   supplierId?: string; // NEW: Link to supplier
   approvalStatus?: 'pending' | 'approved' | 'rejected'; // NEW: For Product Approval
+  departmentId?: string; // NEW: For routing to specific warehouse section
 }
 
 export interface CartItem extends Product {
@@ -41,6 +51,8 @@ export interface CartItem extends Product {
   selectedSize: string;
   selectedColor: string;
   bundleDiscountApplied?: number; // New: Amount saved via bundle
+  // Fulfillment fields
+  pickedStatus?: 'pending' | 'picked'; 
 }
 
 export interface SavedAddress {
@@ -138,11 +150,16 @@ export interface Order {
   date: string;
   items: CartItem[];
   total: number;
-  status: 'new' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned'; // Added returned
+  status: 'new' | 'processing' | 'ready_to_ship' | 'shipped' | 'delivered' | 'cancelled' | 'returned'; 
   shippingMethod: 'delivery' | 'pickup';
   paymentMethod: 'card' | 'cash';
   address?: string;
   referralCodeUsed?: string; // NEW
+  
+  // Fulfillment Fields
+  tableId?: string; // Which table acts as assembly point
+  verificationCode?: string; // 4-6 digit code for delivery
+  courierId?: string;
 }
 
 export interface ChatMessage {
@@ -305,7 +322,8 @@ export interface EmployeeExtended {
   id: string;
   fullName: string;
   phone: string;
-  role: string; // 'courier', 'seller', 'driver', 'manager', 'loader', 'admin'
+  role: string; // 'courier', 'seller', 'driver', 'manager', 'loader', 'admin', 'supervisor'
+  departmentId?: string; // Specific department they work in
   status: 'working' | 'off' | 'fired';
   hireDate: string;
   avatar: string;

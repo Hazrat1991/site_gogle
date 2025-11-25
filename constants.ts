@@ -1,7 +1,13 @@
 
 
-import { Product, Order, Customer, Category, UserProfile, Supplier, Employee, FinanceRecord, ActivityLog, PromoCode, SupportChat, Department, MediaFolder, MediaItem, StoreSettings, EmployeeExtended, Shift, StaffFinancialRecord, Language, Promotion, CourierLocation, Lookbook, ReturnRequest, PackingTable, WarehouseDocument, PayoutRequest, StaticPage, DeliveryZone, NotificationCampaign, Attribute, AdminUser, Review, Brand, Occasion } from './types';
+import { Product, Order, Customer, Category, UserProfile, Supplier, Employee, FinanceRecord, ActivityLog, PromoCode, SupportChat, Department, MediaFolder, MediaItem, StoreSettings, EmployeeExtended, Shift, StaffFinancialRecord, Language, Promotion, CourierLocation, Lookbook, ReturnRequest, PackingTable, WarehouseDocument, PayoutRequest, StaticPage, DeliveryZone, NotificationCampaign, Attribute, AdminUser, Review, Brand, Occasion, Question } from './types';
 
+export const MOCK_QUESTIONS: Question[] = [
+  { id: 'q1', user: 'Фариза', question: 'На рост 165 размер S подойдет?', answer: 'Да, модель идет размер в размер. На 165 см S сядет отлично.', date: '10.10.2023' },
+  { id: 'q2', user: 'Рустам', question: 'Материал сильно мнется?', answer: 'Нет, ткань с добавлением синтетики, почти не мнется.', date: '12.10.2023' }
+];
+
+// Products with explicit Department IDs for picker logic
 export const MOCK_PRODUCTS: Product[] = [
   {
     id: 1,
@@ -21,13 +27,15 @@ export const MOCK_PRODUCTS: Product[] = [
     colors: ["Черный", "Хаки", "Синий"],
     rating: 4.8,
     reviews: [{id: '1', user: 'Алишер', rating: 5, comment: 'Очень теплая!', date: '2023-10-10', photos: ["https://images.unsplash.com/photo-1515434126000-961d90c2351a?w=100&q=80"], status: 'approved'}],
+    questions: MOCK_QUESTIONS,
     isNew: true,
     isTop: true,
     stock: 15,
     material: "Полиэстер, Пух",
     crossSellIds: [9, 5, 8],
     supplierId: '1',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-1' // Clothing
   },
   {
     id: 2,
@@ -51,7 +59,8 @@ export const MOCK_PRODUCTS: Product[] = [
     material: "Шелк 100%",
     crossSellIds: [6, 4],
     supplierId: '2',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-1'
   },
   {
     id: 3,
@@ -75,7 +84,8 @@ export const MOCK_PRODUCTS: Product[] = [
     material: "Текстиль, Резина",
     crossSellIds: [5, 4],
     supplierId: '3',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-3' // Shoes (assuming new dep)
   },
   {
     id: 4,
@@ -95,7 +105,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 50,
     material: "Хлопок",
     supplierId: '2',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-2' // Accessories
   },
   {
     id: 5,
@@ -115,7 +126,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 100,
     material: "Хлопок, Эластан",
     supplierId: '2',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-2'
   },
   {
     id: 6,
@@ -136,7 +148,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 8,
     material: "Эко-кожа",
     supplierId: '1',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-2'
   },
   {
     id: 7,
@@ -157,7 +170,8 @@ export const MOCK_PRODUCTS: Product[] = [
     material: "Деним",
     crossSellIds: [1, 5],
     supplierId: '1',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-1'
   },
   {
     id: 8,
@@ -179,7 +193,8 @@ export const MOCK_PRODUCTS: Product[] = [
     material: "Кожа, Мех",
     crossSellIds: [5, 9],
     supplierId: '3',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-3'
   },
   {
     id: 9,
@@ -199,7 +214,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 20,
     material: "Кашемир",
     supplierId: '2',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-2'
   },
   {
     id: 10,
@@ -219,7 +235,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 14,
     material: "Хлопок, Флис",
     supplierId: '1',
-    approvalStatus: 'approved'
+    approvalStatus: 'approved',
+    departmentId: 'dep-1'
   },
   // Pending product for moderation
   {
@@ -240,7 +257,8 @@ export const MOCK_PRODUCTS: Product[] = [
     stock: 10,
     material: "Трикотаж",
     supplierId: '2',
-    approvalStatus: 'pending'
+    approvalStatus: 'pending',
+    departmentId: 'dep-1'
   }
 ];
 
@@ -278,7 +296,11 @@ export const MOCK_ORDERS: Order[] = [
     shippingMethod: 'delivery',
     paymentMethod: 'cash',
     address: 'ул. Рудаки 10, кв 5',
-    items: [MOCK_PRODUCTS[0] as any]
+    items: [
+       { ...MOCK_PRODUCTS[0], quantity: 1, selectedSize: 'M', selectedColor: 'Черный', pickedStatus: 'pending' } as any
+    ],
+    tableId: 'tbl-1',
+    verificationCode: '4590'
   },
   {
     id: 'ORD-7781',
@@ -290,7 +312,10 @@ export const MOCK_ORDERS: Order[] = [
     shippingMethod: 'pickup',
     paymentMethod: 'card',
     address: '',
-    items: [MOCK_PRODUCTS[1] as any]
+    items: [
+       { ...MOCK_PRODUCTS[1], quantity: 1, selectedSize: 'S', selectedColor: 'Белый', pickedStatus: 'picked' } as any
+    ],
+    verificationCode: '1122'
   },
   {
     id: 'ORD-7780',
@@ -302,7 +327,12 @@ export const MOCK_ORDERS: Order[] = [
     shippingMethod: 'delivery',
     paymentMethod: 'card',
     address: 'пр. Сомони 55',
-    items: [MOCK_PRODUCTS[2] as any, MOCK_PRODUCTS[7] as any]
+    items: [
+       { ...MOCK_PRODUCTS[2], quantity: 1, selectedSize: '42', selectedColor: 'Красный', pickedStatus: 'picked' } as any, 
+       { ...MOCK_PRODUCTS[7], quantity: 1, selectedSize: '42', selectedColor: 'Коричневый', pickedStatus: 'picked' } as any
+    ],
+    courierId: 'emp-3',
+    verificationCode: '3388'
   }
 ];
 
@@ -313,9 +343,9 @@ export const MOCK_CUSTOMERS: Customer[] = [
 ];
 
 export const MOCK_DEPARTMENTS: Department[] = [
-  { id: 'dep-1', name: 'Одежда и Обувь', description: 'Весь ассортимент Fashion', status: 'active', productCount: 120, createdAt: '2023-01-15', color: '#F97316', sortOrder: 1 },
-  { id: 'dep-2', name: 'Аксессуары', description: 'Сумки, часы, украшения', status: 'active', productCount: 45, createdAt: '2023-02-10', color: '#1E3A8A', sortOrder: 2 },
-  { id: 'dep-3', name: 'Дом и Уют', description: 'Текстиль, декор', status: 'inactive', productCount: 0, createdAt: '2023-05-20', color: '#10B981', sortOrder: 3 },
+  { id: 'dep-1', name: 'Одежда', description: 'Основной склад одежды', status: 'active', productCount: 80, createdAt: '2023-01-15', color: '#F97316', sortOrder: 1 },
+  { id: 'dep-2', name: 'Аксессуары', description: 'Сумки, часы, украшения, шапки', status: 'active', productCount: 45, createdAt: '2023-02-10', color: '#1E3A8A', sortOrder: 2 },
+  { id: 'dep-3', name: 'Обувь', description: 'Склад обуви', status: 'active', productCount: 30, createdAt: '2023-05-20', color: '#10B981', sortOrder: 3 },
 ];
 
 export const MOCK_CATEGORIES: Category[] = [
@@ -351,7 +381,7 @@ export const MOCK_CATEGORIES: Category[] = [
     id: 'shoes', 
     name: 'Обувь', 
     subcategories: ['Кроссовки', 'Ботинки', 'Туфли'],
-    departmentId: 'dep-1',
+    departmentId: 'dep-3',
     description: 'Обувь для всех',
     image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
     parentId: undefined,
@@ -514,7 +544,7 @@ export const MOCK_EMPLOYEES_EXTENDED: EmployeeExtended[] = [
     id: 'emp-1',
     fullName: 'Рустам Ахмедов',
     phone: '+992 900 88 77 66',
-    role: 'manager',
+    role: 'supervisor', // Changed from manager for demo of senior shift
     status: 'working',
     hireDate: '2023-01-15',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&q=80',
@@ -532,6 +562,7 @@ export const MOCK_EMPLOYEES_EXTENDED: EmployeeExtended[] = [
     fullName: 'Сарвиноз Бобоева',
     phone: '+992 918 33 22 11',
     role: 'seller',
+    departmentId: 'dep-1', // Clothing Dept
     status: 'working',
     hireDate: '2023-03-10',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
@@ -560,6 +591,24 @@ export const MOCK_EMPLOYEES_EXTENDED: EmployeeExtended[] = [
     totalAdvances: 100,
     hoursWorkedMonth: 80,
     shiftsCountMonth: 10,
+    earnedMonth: 1500,
+    history: []
+  },
+  {
+    id: 'emp-4',
+    fullName: 'Амир Т.',
+    phone: '+992 90 123 45 67',
+    role: 'seller',
+    departmentId: 'dep-3', // Shoe Dept
+    status: 'working',
+    hireDate: '2023-07-15',
+    avatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&q=80',
+    hourlyRate: 15,
+    loginCode: '4444',
+    totalDebt: 0,
+    totalAdvances: 0,
+    hoursWorkedMonth: 100,
+    shiftsCountMonth: 14,
     earnedMonth: 1500,
     history: []
   }
@@ -645,7 +694,7 @@ export const MOCK_RETURN_REQUESTS: ReturnRequest[] = [
 
 export const MOCK_PACKING_TABLES: PackingTable[] = [
   { id: 'tbl-1', name: 'Стол №1', supervisorId: 'emp-1', supervisorName: 'Рустам Ахмедов', status: 'active', currentOrderIds: ['ORD-7782'], totalOrdersProcessed: 145 },
-  { id: 'tbl-2', name: 'Стол №2', supervisorId: 'emp-2', supervisorName: 'Сарвиноз Бобоева', status: 'busy', currentOrderIds: ['ORD-7780', 'ORD-7783'], totalOrdersProcessed: 89 },
+  { id: 'tbl-2', name: 'Стол №2', supervisorId: 'emp-2', supervisorName: 'Сарвиноз Бобоева', status: 'busy', currentOrderIds: ['ORD-7780'], totalOrdersProcessed: 89 },
 ];
 
 export const MOCK_WAREHOUSE_DOCUMENTS: WarehouseDocument[] = [

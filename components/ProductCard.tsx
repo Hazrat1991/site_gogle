@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Icon } from "@iconify/react";
 import { Product } from '../types';
@@ -13,6 +14,7 @@ interface ProductCardProps {
   onCompare?: (product: Product) => void;
   isCompare?: boolean;
   viewMode?: 'grid' | 'list'; // Added support for List view if needed later
+  onQuickView?: (product: Product) => void; // NEW
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -23,7 +25,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isFavorite = false,
   onToggleFavorite,
   onCompare,
-  isCompare
+  isCompare,
+  onQuickView
 }) => {
   const [imgIndex, setImgIndex] = useState(0);
 
@@ -90,6 +93,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             className={`size-5 ${isFavorite ? "text-red-500" : "text-muted-foreground hover:text-red-500"}`} 
           />
         </button>
+        
+        {/* Quick View Button (NEW) */}
+        {onQuickView && (
+           <button 
+             onClick={(e) => { e.stopPropagation(); onQuickView(product); }}
+             className="absolute bottom-2 right-2 size-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center transition-all z-20 hover:scale-110 active:scale-90 shadow-sm text-slate-700"
+           >
+             <Icon icon="solar:eye-bold" className="size-5" />
+           </button>
+        )}
         
         {/* Compare Button */}
         {!isFullWidth && onCompare && (

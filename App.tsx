@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Icon } from "@iconify/react";
 import { Product, CartItem, Language, Order, Customer, Category, UserProfile, EmployeeExtended, Shift, StaffFinancialRecord, FittingBooking, Supplier } from './types';
@@ -23,8 +24,13 @@ import { FitFinderModal } from './components/FitFinderModal';
 import { GreetingHeader, FlashSale, DailyBonus, BrandWall, MasonryGrid, OccasionList, LiveTicker } from './components/HomeWidgets';
 import { CategoryHero, SkeletonGrid, InFeedBanner } from './components/ListingWidgets';
 import { CartView } from './components/CartView';
+import { FavoritesView } from './components/FavoritesView';
+import { ProfileView } from './components/ProfileView';
+import { LoginView } from './components/LoginView'; 
+import { QuickViewModal } from './components/QuickViewModal'; 
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false); 
   const [lang, setLang] = useState<Language>('ru');
   const [view, setView] = useState<{ name: string, data?: any }>({ name: 'home' });
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -45,6 +51,9 @@ const App: React.FC = () => {
   const [waitlist, setWaitlist] = useState<number[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
   
+  // Quick View State
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null); 
+
   // Logic for Recently Viewed
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<number[]>([]);
 
@@ -212,13 +221,12 @@ const App: React.FC = () => {
      }
   };
 
-  // Bundle Logic: If cart has item from Category A and Category B, apply discount
+  // Bundle Logic
   const bundleSavings = useMemo(() => {
     const hasJeans = cart.some(i => i.name.toLowerCase().includes('джинсы') || i.subCategory === 'Jeans');
     const hasTshirt = cart.some(i => i.name.toLowerCase().includes('футболка') || i.subCategory === 'T-Shirts');
     
     if (hasJeans && hasTshirt) {
-        // Apply 15% discount to the bundle items (simplified: 15% of total of these items)
         const bundleItems = cart.filter(i => i.name.toLowerCase().includes('джинсы') || i.name.toLowerCase().includes('футболка'));
         const totalBundlePrice = bundleItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
         return Math.round(totalBundlePrice * 0.15);
@@ -230,8 +238,10 @@ const App: React.FC = () => {
     // If referral code used
     if (data.referralCode && data.referralCode.length > 3) {
         addToast(`Скидка 5% по коду ${data.referralCode} применена!`, 'success');
-        // Logic to reward referrer would go here in backend
     }
+
+    // Generate verification code for delivery
+    const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) - bundleSavings;
     const newOrder: Order = {
@@ -244,15 +254,21 @@ const App: React.FC = () => {
        total: total,
        status: 'new',
        shippingMethod: 'delivery',
-       items: [...cart],
-       referralCodeUsed: data.referralCode
+       // Add pending items with department info
+       items: cart.map(item => ({
+          ...item,
+          pickedStatus: 'pending'
+       })),
+       referralCodeUsed: data.referralCode,
+       verificationCode: verificationCode,
+       tableId: 'Стол 1' // Default table assignment logic would go here
     };
 
     setOrders([newOrder, ...orders]);
     setCart([]);
     setIsCheckoutOpen(false);
-    addToast('Заказ успешно оформлен!', 'success');
-    setTimeout(() => setView({ name: 'home' }), 1500);
+    addToast(`Заказ оформлен! Ваш код получения: ${verificationCode}`, 'success');
+    setTimeout(() => setView({ name: 'profile' }), 1500);
   };
 
   const handleFittingBooking = (date: string, time: string) => {
@@ -271,7 +287,6 @@ const App: React.FC = () => {
   };
 
   const handleVendorRegister = (data: any) => {
-     // Create pending supplier
      const newSupplier: Supplier = {
         id: `sup-${Date.now()}`,
         name: data.shopName,
@@ -295,7 +310,6 @@ const App: React.FC = () => {
   };
   
   const handleProductClick = (product: Product) => {
-     // Add to recently viewed logic
      if (!recentlyViewedIds.includes(product.id)) {
         setRecentlyViewedIds(prev => [product.id, ...prev].slice(0, 5));
      }
@@ -304,7 +318,6 @@ const App: React.FC = () => {
 
   const handleSelectCategory = (catId: string) => {
     setFilters({ ...filters, category: catId, subCategory: null });
-    // Simulate Loading
     setIsListingLoading(true);
     setTimeout(() => setIsListingLoading(false), 800);
   };
@@ -370,32 +383,25 @@ const App: React.FC = () => {
     setIsCheckoutOpen(true);
   };
 
-  // --- RENDER FUNCTIONS ---
+  // AUTHENTICATION CHECK
+  if (!isAuthenticated && !localStorage.getItem('grand_auth_bypass')) {
+     return <LoginView onLoginSuccess={() => {
+        setIsAuthenticated(true);
+        localStorage.setItem('grand_auth_bypass', 'true');
+     }} />;
+  }
 
   const renderHome = () => {
-     // Prepare data for widgets
-     // 1. Promotions / Discounts (Sale)
      const saleProducts = products.filter(p => p.oldPrice && p.oldPrice > p.price);
      const flashSaleProduct = saleProducts.length > 0 ? saleProducts[0] : null;
-
-     // 2. New Arrivals
      const newArrivals = products.filter(p => p.isNew);
-
-     // 3. Recently Viewed
      const recentlyViewed = products.filter(p => recentlyViewedIds.includes(p.id));
-
-     // 4. Recommended (Mock logic: just take some items that are top rated)
      const recommended = products.filter(p => p.rating >= 4.8).slice(0, 5);
-     
-     // 5. Top Sellers
      const topSellers = products.filter(p => p.isTop);
-
-     // Trending (Masonry) - separate from main lists
      const trendingProducts = products.filter(p => p.isTop).slice(0, 3);
 
      return (
        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide bg-background">
-         {/* Widgets / Shell */}
          <LiveTicker />
          <GreetingHeader name={userProfile.name.split(' ')[0]} />
          <CategoryBlock lang={lang} onSelectCategory={(id) => { handleSelectCategory(id); setView({ name: 'listing' }); }} />
@@ -406,7 +412,7 @@ const App: React.FC = () => {
             <BrandWall brands={MOCK_BRANDS} />
          </div>
 
-         {/* SECTION 1: PROMOTIONS & DISCOUNTS */}
+         {/* PROMOTIONS */}
          <div className="mt-6 mb-2">
             <div className="flex justify-between items-center px-4 mb-3">
                <h2 className="font-heading font-bold text-lg text-red-600 flex items-center gap-2">
@@ -415,15 +421,12 @@ const App: React.FC = () => {
                </h2>
                <button onClick={() => { setFilters({...filters, onlySale: true}); setView({ name: 'listing' }); }} className="text-primary text-sm font-medium">См. все</button>
             </div>
-            
-            {/* Flash Sale Widget integrated here */}
             {flashSaleProduct && (
                 <FlashSale product={flashSaleProduct} onClick={() => handleProductClick(flashSaleProduct)} />
             )}
-
             <div className="flex overflow-x-auto px-4 gap-4 pb-4 scrollbar-hide snap-x">
                {saleProducts.map(p => (
-                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} />
+                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} onQuickView={setQuickViewProduct} />
                ))}
             </div>
          </div>
@@ -432,7 +435,7 @@ const App: React.FC = () => {
             <MasonryGrid products={trendingProducts} onProductClick={handleProductClick} />
          </div>
 
-         {/* SECTION 2: NEW ARRIVALS */}
+         {/* NEW ARRIVALS */}
          <div className="mt-6 mb-2">
             <div className="flex justify-between items-center px-4 mb-3">
                <h2 className="font-heading font-bold text-lg text-foreground">
@@ -442,12 +445,12 @@ const App: React.FC = () => {
             </div>
             <div className="flex overflow-x-auto px-4 gap-4 pb-4 scrollbar-hide snap-x">
                {newArrivals.map(p => (
-                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} />
+                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} onQuickView={setQuickViewProduct} />
                ))}
             </div>
          </div>
 
-         {/* SECTION 3: RECENTLY VIEWED */}
+         {/* RECENTLY VIEWED */}
          {recentlyViewed.length > 0 && (
             <div className="mb-6">
                <h2 className="px-4 font-heading font-bold text-lg text-foreground mb-3">
@@ -455,13 +458,12 @@ const App: React.FC = () => {
                </h2>
                <div className="flex overflow-x-auto px-4 gap-4 pb-4 scrollbar-hide snap-x">
                   {recentlyViewed.map(p => (
-                     <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} />
+                     <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} onQuickView={setQuickViewProduct} />
                   ))}
                </div>
             </div>
          )}
 
-         {/* Lookbook Teaser (placed here to break up the lists) */}
          <div className="mt-2 px-4 mb-6">
             <div onClick={() => setView({ name: 'lookbook' })} className="w-full bg-slate-900 rounded-2xl p-6 text-white text-center cursor-pointer shadow-xl relative overflow-hidden group">
                <div className="absolute inset-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80')] bg-cover bg-center group-hover:scale-105 transition-transform duration-700"></div>
@@ -473,19 +475,19 @@ const App: React.FC = () => {
             </div>
          </div>
 
-         {/* SECTION 4: RECOMMENDED */}
+         {/* RECOMMENDED */}
          <div className="mb-6">
             <h2 className="px-4 font-heading font-bold text-lg text-foreground mb-3">
                {lang === 'ru' ? 'Рекомендовано вам' : 'Ба шумо тавсия дода мешавад'}
             </h2>
             <div className="flex overflow-x-auto px-4 gap-4 pb-4 scrollbar-hide snap-x">
                {recommended.map(p => (
-                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} />
+                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} onQuickView={setQuickViewProduct} />
                ))}
             </div>
          </div>
 
-         {/* SECTION 5: TOP SELLERS */}
+         {/* TOP SELLERS */}
          <div className="mb-6">
             <div className="flex justify-between items-center px-4 mb-3">
                <h2 className="font-heading font-bold text-lg text-foreground">
@@ -495,7 +497,7 @@ const App: React.FC = () => {
             </div>
             <div className="flex overflow-x-auto px-4 gap-4 pb-4 scrollbar-hide snap-x">
                {topSellers.map(p => (
-                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} />
+                  <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFullWidth isFavorite={favorites.includes(p.id)} onToggleFavorite={toggleFavorite} onQuickView={setQuickViewProduct} />
                ))}
             </div>
          </div>
@@ -510,26 +512,49 @@ const App: React.FC = () => {
     const subcategories = currentCategory ? currentCategory.subcategories : [];
     const heroConfig = CATEGORY_CONFIG[filters.category];
 
-    // Banner injection logic
     const productsWithBanners: (Product | any)[] = [...filteredProducts];
     if (filteredProducts.length > 4) {
        productsWithBanners.splice(4, 0, { isBanner: true, data: IN_FEED_BANNERS[0] });
     }
     if (filteredProducts.length > 8) {
-       productsWithBanners.splice(9, 0, { isBanner: true, data: IN_FEED_BANNERS[1] }); // Lookbook
+       productsWithBanners.splice(9, 0, { isBanner: true, data: IN_FEED_BANNERS[1] });
     }
     
     return (
       <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide bg-background">
-         {/* Category Hero Banner */}
+         {/* Main Categories Header - NEW */}
+         <div className="pt-4 px-4 flex overflow-x-auto gap-4 scrollbar-hide mb-4">
+            <button
+               onClick={() => handleSelectCategory('all')}
+               className={`flex flex-col items-center gap-2 min-w-[64px] transition-all ${filters.category === 'all' ? 'scale-105' : 'opacity-70 hover:opacity-100'}`}
+            >
+               <div className={`size-16 rounded-full flex items-center justify-center bg-slate-100 border-2 ${filters.category === 'all' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}>
+                  <Icon icon="solar:infinity-bold" className="size-8 text-slate-800" />
+               </div>
+               <span className={`text-xs font-bold ${filters.category === 'all' ? 'text-primary' : 'text-slate-600'}`}>
+                  {lang === 'ru' ? 'Все' : 'Ҳама'}
+               </span>
+            </button>
+            
+            {categories.map(cat => (
+               <button
+                  key={cat.id}
+                  onClick={() => handleSelectCategory(cat.id)}
+                  className={`flex flex-col items-center gap-2 min-w-[64px] transition-all ${filters.category === cat.id ? 'scale-105' : 'opacity-70 hover:opacity-100'}`}
+               >
+                  <div className={`size-16 rounded-full flex items-center justify-center bg-slate-100 border-2 overflow-hidden ${filters.category === cat.id ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}>
+                     <img src={cat.image} className="w-full h-full object-cover" alt={cat.name} />
+                  </div>
+                  <span className={`text-xs font-bold whitespace-nowrap ${filters.category === cat.id ? 'text-primary' : 'text-slate-600'}`}>{cat.name}</span>
+               </button>
+            ))}
+         </div>
+
          {heroConfig && filters.category !== 'all' && (
             <CategoryHero image={heroConfig.image} title={heroConfig.title} subtitle={heroConfig.subtitle} />
          )}
 
-         {/* Sticky Controls */}
          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100">
-            
-            {/* Horizontal Subcategories (Pills) */}
             {subcategories.length > 0 && (
                <div className="py-3 px-4 flex overflow-x-auto gap-2 scrollbar-hide border-b border-slate-50">
                   {subcategories.map(sub => (
@@ -544,10 +569,8 @@ const App: React.FC = () => {
                </div>
             )}
 
-            {/* Quick Filters Row */}
             <div className="px-4 py-2 flex items-center justify-between">
                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-                  {/* Size Quick Filter */}
                   <div className="relative group">
                      <button className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border ${filters.size ? 'bg-primary/10 text-primary border-primary' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                         {filters.size || 'Размер'} <Icon icon="solar:alt-arrow-down-bold" className="size-3" />
@@ -561,7 +584,6 @@ const App: React.FC = () => {
                      </div>
                   </div>
 
-                  {/* Color Quick Filter */}
                   <div className="relative group">
                      <button className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border ${filters.color ? 'bg-primary/10 text-primary border-primary' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                         {filters.color || 'Цвет'} <Icon icon="solar:alt-arrow-down-bold" className="size-3" />
@@ -576,13 +598,11 @@ const App: React.FC = () => {
                      </div>
                   </div>
                   
-                  {/* Toggle Sale */}
                   <button onClick={() => setFilters({...filters, onlySale: !filters.onlySale})} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${filters.onlySale ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                      % Sale
                   </button>
                </div>
 
-               {/* Grid Toggle */}
                <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0">
                   <button onClick={() => setIsGridSingle(false)} className={`p-1.5 rounded-md transition-colors ${!isGridSingle ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>
                      <Icon icon="solar:gallery-wide-bold" className="size-4" />
@@ -602,7 +622,6 @@ const App: React.FC = () => {
             </div>
          </div>
 
-         {/* Product Grid / Skeleton */}
          {isListingLoading ? (
             <SkeletonGrid />
          ) : (
@@ -634,6 +653,7 @@ const App: React.FC = () => {
                         onCompare={toggleCompare} 
                         isCompare={!!compareList.find(c => c.id === p.id)} 
                         isFullWidth={isGridSingle}
+                        onQuickView={setQuickViewProduct} 
                      />
                   );
                })}
@@ -643,92 +663,6 @@ const App: React.FC = () => {
     );
   };
 
-  const renderFavorites = () => (
-    <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide bg-background px-4 py-4">
-      <h1 className="text-2xl font-bold mb-4">{t.favorites}</h1>
-      <div className="grid grid-cols-2 gap-4">{products.filter(p => favorites.includes(p.id)).map(p => <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} onAddToCart={addToCart} isFavorite={true} onToggleFavorite={toggleFavorite} onCompare={toggleCompare} isCompare={!!compareList.find(c => c.id === p.id)} />)}</div>
-    </div>
-  );
-
-  const renderProfile = () => (
-      <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide bg-slate-50 dark:bg-slate-950">
-         <div className="bg-white dark:bg-card p-6 pb-8 rounded-b-3xl shadow-sm relative">
-           <div className="flex items-center gap-4">
-              <div className="relative">
-                 <div className="size-20 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 shadow-md flex items-center justify-center">
-                   {userProfile.avatar ? <img src={userProfile.avatar} alt="User" className="w-full h-full object-cover" /> : <Icon icon="solar:user-bold" className="size-10 text-slate-300" />}
-                 </div>
-              </div>
-              <div><h1 className="text-xl font-bold text-slate-800 dark:text-white">{userProfile.name}</h1><p className="text-sm text-slate-400 font-medium mb-1">{userProfile.email}</p></div>
-           </div>
-        </div>
-
-        {/* Referral Program Section */}
-        <div className="px-4 mt-6">
-           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-              <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                 <Icon icon="solar:users-group-rounded-bold" className="text-primary" />
-                 Приведи друга
-              </h3>
-              <p className="text-xs text-slate-500 mb-4">Делись кодом, получай 2% от покупок друзей!</p>
-              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 border-dashed">
-                 <span className="font-mono text-lg font-bold text-slate-800 tracking-wider flex-1 text-center">{userProfile.referralCode}</span>
-                 <button className="text-primary font-bold text-xs bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-100" onClick={() => { navigator.clipboard.writeText(userProfile.referralCode); addToast('Код скопирован!'); }}>
-                    КОПИРОВАТЬ
-                 </button>
-              </div>
-              <div className="mt-4 flex gap-4">
-                 <div>
-                    <div className="text-xs text-slate-400 font-bold uppercase">Заработано</div>
-                    <div className="font-bold text-green-600 text-lg">{userProfile.referralEarnings} с.</div>
-                 </div>
-                 <div>
-                    <div className="text-xs text-slate-400 font-bold uppercase">Приглашено</div>
-                    <div className="font-bold text-slate-800 text-lg">{userProfile.referralsCount} чел.</div>
-                 </div>
-              </div>
-           </div>
-        </div>
-
-        {/* Gift Card Promo */}
-        <div className="px-4 mt-6">
-           <div onClick={() => addToCart({ id: 999, name: "Подарочный сертификат 500с", price: 500, images: ['https://images.unsplash.com/photo-1549465220-1a8b9238cd48'], category: 'gift', sizes: ['500'], colors: ['Gold'], rating: 5, reviews: [], description: 'Подарок' } as any)} className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-4 text-white flex items-center justify-between cursor-pointer">
-              <div>
-                 <div className="font-bold text-lg">Подарить сертификат</div>
-                 <div className="text-xs opacity-80">Лучший подарок близким</div>
-              </div>
-              <Icon icon="solar:gift-bold" className="size-8" />
-           </div>
-        </div>
-
-        {/* Vendor Registration */}
-        <div className="px-4 mt-6">
-           <div onClick={() => setIsVendorModalOpen(true)} className="bg-slate-800 rounded-2xl p-4 text-white flex items-center justify-between cursor-pointer shadow-lg shadow-slate-800/30">
-              <div className="flex items-center gap-3">
-                 <Icon icon="solar:shop-bold-duotone" className="size-8 text-yellow-400" />
-                 <div>
-                    <div className="font-bold text-lg">Стать продавцом</div>
-                    <div className="text-xs opacity-70">Продавайте на Grand Market</div>
-                 </div>
-              </div>
-              <Icon icon="solar:arrow-right-bold" className="size-5 opacity-50" />
-           </div>
-        </div>
-
-        <div className="px-4 space-y-4 mt-6">
-            <div className="bg-white p-4 rounded-xl flex justify-between items-center cursor-pointer shadow-sm" onClick={() => setView({ name: 'admin' })}>
-               <span className="font-bold">Админ панель</span>
-               <Icon icon="solar:settings-bold" className="text-slate-400" />
-            </div>
-            <div className="bg-white p-4 rounded-xl flex justify-between items-center cursor-pointer shadow-sm" onClick={() => setView({ name: 'employee_portal' })}>
-               <span className="font-bold">Вход для сотрудников</span>
-               <Icon icon="solar:user-id-bold" className="text-slate-400" />
-            </div>
-        </div>
-      </div>
-  );
-
-  // --- View Routing ---
   if (view.name === 'product' && view.data) {
     return (
     <>
@@ -769,8 +703,8 @@ const App: React.FC = () => {
             employees={employees} setEmployees={setEmployees}
             shifts={shifts} setShifts={setShifts}
             financialRecords={financialRecords} setFinancialRecords={setFinancialRecords}
-            bookings={bookings} // NEW
-            suppliers={suppliers} setSuppliers={setSuppliers} // NEW
+            bookings={bookings} 
+            suppliers={suppliers} setSuppliers={setSuppliers}
           />
        </div>
      );
@@ -785,6 +719,8 @@ const App: React.FC = () => {
       <CompareDrawer isOpen={isCompareOpen} onClose={() => setIsCompareOpen(false)} products={compareList} onRemove={(id) => setCompareList(prev => prev.filter(p => p.id !== id))} onAddToCart={addToCart} />
       <FittingRoomModal isOpen={isFittingModalOpen} onClose={() => setIsFittingModalOpen(false)} onSubmit={handleFittingBooking} itemCount={cart.length} />
       <VendorRegistrationModal isOpen={isVendorModalOpen} onClose={() => setIsVendorModalOpen(false)} onSubmit={handleVendorRegister} />
+      
+      <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={addToCart} />
 
       {compareList.length > 0 && !isCompareOpen && view.name !== 'admin' && view.name !== 'employee_portal' && (
          <button onClick={() => setIsCompareOpen(true)} className="fixed bottom-24 right-4 z-40 bg-primary text-white p-4 rounded-full shadow-xl flex items-center justify-center gap-2 animate-bounce"><Icon icon="solar:scale-bold" className="size-6" /><span className="font-bold text-xs">{compareList.length}</span></button>
@@ -809,8 +745,26 @@ const App: React.FC = () => {
         />
       )}
       
-      {view.name === 'profile' && renderProfile()}
-      {view.name === 'favorites' && renderFavorites()}
+      {view.name === 'profile' && (
+        <ProfileView 
+          user={userProfile} 
+          orders={orders} 
+          onNavigate={setView}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleDarkMode}
+        />
+      )}
+      
+      {view.name === 'favorites' && (
+        <FavoritesView 
+          favorites={favorites} 
+          products={products} 
+          toggleFavorite={toggleFavorite} 
+          onAddToCart={addToCart} 
+          onNavigate={setView}
+          lang={lang}
+        />
+      )}
 
       <BottomNav activeView={view.name} onNavigate={setView} cartCount={cart.length} />
     </div>

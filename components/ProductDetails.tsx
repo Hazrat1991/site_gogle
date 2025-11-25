@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Icon } from "@iconify/react";
-import { Product, Language } from '../types';
-import { DICTIONARY, MOCK_PRODUCTS } from '../constants';
+import { Product, Language, Question } from '../types';
+import { DICTIONARY, MOCK_PRODUCTS, MOCK_QUESTIONS } from '../constants';
 import { ProductCard } from './ProductCard';
 import { FitFinderModal } from './FitFinderModal';
 
@@ -34,6 +35,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
   const [qty, setQty] = useState(1);
   const [isDescOpen, setIsDescOpen] = useState(true);
   const [isReviewsOpen, setIsReviewsOpen] = useState(true);
+  const [isQAOpen, setIsQAOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [isFitFinderOpen, setIsFitFinderOpen] = useState(false);
   const [isNotifySet, setIsNotifySet] = useState(false);
@@ -47,12 +49,16 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
 
   const t = DICTIONARY[lang];
   
+  // Merge mock questions if not present on product object
+  const questions: Question[] = product.questions || MOCK_QUESTIONS;
+
   useEffect(() => {
     setSelectedSize(product.sizes[0]);
     setSelectedColor(product.colors[0]);
     setQty(1);
     setIsDescOpen(true);
     setIsReviewsOpen(true);
+    setIsQAOpen(false);
     setShowVideo(false);
     setIsNotifySet(false);
     setAreReviewsExpanded(false);
@@ -413,7 +419,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
           </div>
 
           {/* Reviews Section */}
-          <div className="mb-8 border-t border-slate-100 pt-6">
+          <div className="mb-4 border-t border-slate-100 pt-6">
              <button 
                onClick={() => setIsReviewsOpen(!isReviewsOpen)}
                className="flex items-center justify-between w-full mb-4"
@@ -477,6 +483,49 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
                          <Icon icon="solar:alt-arrow-down-linear" className={`transition-transform ${areReviewsExpanded ? 'rotate-180' : ''}`} />
                       </button>
                    )}
+                 </div>
+             )}
+          </div>
+
+          {/* Questions & Answers Section - NEW */}
+          <div className="mb-8 border-t border-slate-100 pt-6">
+             <button 
+               onClick={() => setIsQAOpen(!isQAOpen)}
+               className="flex items-center justify-between w-full mb-4"
+             >
+               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg">
+                    <Icon icon="solar:chat-round-dots-bold" className="size-5" />
+                  </div>
+                  Вопросы и ответы <span className="text-slate-400 text-sm font-normal">({questions.length})</span>
+               </h3>
+               <Icon 
+                 icon="solar:alt-arrow-down-linear" 
+                 className={`text-slate-400 transition-transform ${isQAOpen ? 'rotate-180' : ''}`} 
+               />
+             </button>
+             
+             {isQAOpen && (
+                 <div className="space-y-4 animate-fade-in">
+                   {questions.map((q) => (
+                      <div key={q.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                         <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-sm text-slate-800">{q.user}</span>
+                            <span className="text-[10px] text-slate-400">{q.date}</span>
+                         </div>
+                         <p className="text-sm text-slate-900 font-bold mb-2">{q.question}</p>
+                         {q.answer && (
+                            <div className="pl-3 border-l-2 border-primary/50 mt-2">
+                               <p className="text-xs font-bold text-slate-500 mb-0.5">Ответ магазина:</p>
+                               <p className="text-sm text-slate-600">{q.answer}</p>
+                            </div>
+                         )}
+                      </div>
+                   ))}
+                   <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 font-bold text-sm hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
+                      <Icon icon="solar:pen-new-square-bold" />
+                      Задать вопрос
+                   </button>
                  </div>
              )}
           </div>
