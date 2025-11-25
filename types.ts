@@ -162,6 +162,7 @@ export interface Order {
   verificationCode?: string; // 4-6 digit code for delivery
   courierId?: string;
   clientConfirmed?: boolean; // Option C: Client confirmed via button
+  internalNotes?: string; // NEW: For admin comments
 }
 
 export interface ChatMessage {
