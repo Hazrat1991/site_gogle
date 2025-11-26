@@ -1444,85 +1444,247 @@ const TablesView: React.FC<{
    );
 };
 
-const WarehouseView: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<'all' | 'income' | 'writeoff' | 'transfer'>('all');
+const WarehouseView: React.FC<{ products: Product[], setProducts: (p: Product[]) => void }> = ({ products, setProducts }) => {
+   const [mode, setMode] = useState<'inventory' | 'stocktake' | 'documents'>('inventory');
+   const [docType, setDocType] = useState<'all' | 'income' | 'writeoff' | 'transfer'>('all');
+   const [search, setSearch] = useState('');
    
+   // KPI Calculations
+   const totalValue = products.reduce((acc, p) => acc + (p.buyPrice || p.price * 0.6) * (p.stock || 0), 0);
+   const totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
+   const lowStock = products.filter(p => (p.stock || 0) < 5).length;
+   
+   // Handlers
+   const handleUpdateStock = (id: number, delta: number) => {
+      setProducts(products.map(p => p.id === id ? { ...p, stock: Math.max(0, (p.stock || 0) + delta) } : p));
+   };
+
+   const handleManualStockChange = (id: number, value: string) => {
+      const num = parseInt(value) || 0;
+      setProducts(products.map(p => p.id === id ? { ...p, stock: num } : p));
+   };
+
    return (
-      <div className="space-y-4 animate-fade-in">
-         <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Складские документы</h2>
-            <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-               <Icon icon="solar:file-text-bold" />
-               Создать документ
-            </button>
+      <div className="space-y-6 animate-fade-in pb-10">
+         
+         {/* Top KPI Cards */}
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+               <div className="size-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center"><Icon icon="solar:wallet-money-bold" className="size-6" /></div>
+               <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">Стоимость склада</div>
+                  <div className="text-2xl font-black text-slate-800">{totalValue.toLocaleString()} с.</div>
+               </div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+               <div className="size-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><Icon icon="solar:box-bold" className="size-6" /></div>
+               <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">Всего единиц</div>
+                  <div className="text-2xl font-black text-slate-800">{totalItems} шт.</div>
+               </div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+               <div className="size-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center"><Icon icon="solar:danger-circle-bold" className="size-6" /></div>
+               <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase">Дефицит (Low Stock)</div>
+                  <div className="text-2xl font-black text-red-500">{lowStock} товаров</div>
+               </div>
+            </div>
          </div>
 
-         {/* Tabs */}
-         <div className="flex gap-2 overflow-x-auto pb-2">
-            {[
-               { id: 'all', label: 'Все документы' },
-               { id: 'income', label: 'Приходные' },
-               { id: 'writeoff', label: 'Списания' },
-               { id: 'transfer', label: 'Перемещения' }
-            ].map(tab => (
-               <button 
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.id ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-               >
-                  {tab.label}
-               </button>
-            ))}
+         {/* Tabs & Actions */}
+         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto">
+               <button onClick={() => setMode('inventory')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${mode === 'inventory' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Остатки</button>
+               <button onClick={() => setMode('documents')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${mode === 'documents' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Документы</button>
+            </div>
+
+            {mode === 'inventory' && (
+               <div className="flex gap-2 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-64">
+                     <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                     <input 
+                        type="text" 
+                        placeholder="Поиск товара..." 
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary" 
+                        value={search} 
+                        onChange={e => setSearch(e.target.value)} 
+                     />
+                  </div>
+                  <button 
+                     onClick={() => setMode(mode === 'stocktake' ? 'inventory' : 'stocktake')} 
+                     className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors ${mode === 'stocktake' ? 'bg-orange-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                     <Icon icon="solar:checklist-minimalistic-bold" />
+                     {mode === 'stocktake' ? 'Завершить ревизию' : 'Ревизия'}
+                  </button>
+                  <button onClick={() => alert('Эмуляция сканера штрих-кода')} className="size-11 bg-slate-800 text-white rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-transform">
+                     <Icon icon="solar:scanner-bold" className="size-5" />
+                  </button>
+               </div>
+            )}
+            
+            {mode === 'documents' && (
+                <button className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
+                   <Icon icon="solar:file-text-bold" />
+                   Создать документ
+                </button>
+            )}
          </div>
 
-         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[800px]">
-               <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                     <th className="p-4">№ Документа</th>
-                     <th className="p-4">Тип</th>
-                     <th className="p-4">Дата</th>
-                     <th className="p-4">Контрагент / Причина</th>
-                     <th className="p-4">Сумма</th>
-                     <th className="p-4">Товаров</th>
-                     <th className="p-4">Статус</th>
-                     <th className="p-4">Действия</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-100">
-                  {MOCK_WAREHOUSE_DOCUMENTS.filter(d => activeTab === 'all' || d.type === activeTab).map(doc => (
-                     <tr key={doc.id} className="hover:bg-slate-50">
-                        <td className="p-4 font-mono font-bold text-slate-800">{doc.id}</td>
-                        <td className="p-4">
-                           <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                              doc.type === 'income' ? 'bg-green-100 text-green-700' :
-                              doc.type === 'writeoff' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                           }`}>
-                              {doc.type === 'income' ? 'Приход' : doc.type === 'writeoff' ? 'Списание' : 'Перемещение'}
-                           </span>
-                        </td>
-                        <td className="p-4 text-slate-500">{doc.date}</td>
-                        <td className="p-4">
-                           <div className="font-bold text-slate-800">{doc.supplierName || '-'}</div>
-                           <div className="text-xs text-slate-400">{doc.comment}</div>
-                        </td>
-                        <td className="p-4 font-bold">{doc.totalAmount} с.</td>
-                        <td className="p-4">{doc.itemCount} шт.</td>
-                        <td className="p-4">
-                           <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${doc.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                              {doc.status === 'completed' ? 'Проведен' : 'Черновик'}
-                           </span>
-                        </td>
-                        <td className="p-4 flex gap-2">
-                           <button className="text-slate-400 hover:text-primary"><Icon icon="solar:eye-bold" /></button>
-                           <button className="text-slate-400 hover:text-primary"><Icon icon="solar:printer-bold" /></button>
-                        </td>
+         {/* INVENTORY / STOCKTAKE MODE */}
+         {(mode === 'inventory' || mode === 'stocktake') && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+               <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-100">
+                     <tr>
+                        <th className="p-4">Товар</th>
+                        <th className="p-4">Категория</th>
+                        <th className="p-4 w-1/4">Текущий остаток</th>
+                        <th className="p-4">Статус</th>
+                        <th className="p-4 text-right">Действия</th>
                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                     {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => {
+                        const stock = p.stock || 0;
+                        const maxStock = 20; // Mock max for bar
+                        const percentage = Math.min(100, (stock / maxStock) * 100);
+                        const color = stock === 0 ? 'bg-slate-300' : stock < 5 ? 'bg-red-500' : 'bg-green-500';
+
+                        return (
+                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-4 flex items-center gap-3">
+                                 <div className="size-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
+                                    <img src={p.images[0]} className="w-full h-full object-cover" />
+                                 </div>
+                                 <div>
+                                    <div className="font-bold text-slate-800">{p.name}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono">SKU: {p.id}</div>
+                                 </div>
+                              </td>
+                              <td className="p-4 text-slate-500 capitalize">{p.category}</td>
+                              <td className="p-4">
+                                 {mode === 'stocktake' ? (
+                                    <div className="flex items-center gap-2">
+                                       <button onClick={() => handleUpdateStock(p.id, -1)} className="size-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center font-bold hover:bg-red-100">-</button>
+                                       <input 
+                                          type="number" 
+                                          className="w-20 text-center font-bold text-lg border-b-2 border-slate-200 focus:border-primary outline-none bg-transparent" 
+                                          value={stock} 
+                                          onChange={(e) => handleManualStockChange(p.id, e.target.value)}
+                                       />
+                                       <button onClick={() => handleUpdateStock(p.id, 1)} className="size-8 bg-green-50 text-green-500 rounded-lg flex items-center justify-center font-bold hover:bg-green-100">+</button>
+                                    </div>
+                                 ) : (
+                                    <div>
+                                       <div className="flex justify-between text-xs font-bold mb-1">
+                                          <span>{stock} шт.</span>
+                                          <span className="text-slate-400">из {maxStock}</span>
+                                       </div>
+                                       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{width: `${percentage}%`}}></div>
+                                       </div>
+                                    </div>
+                                 )}
+                              </td>
+                              <td className="p-4">
+                                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${stock > 5 ? 'bg-green-100 text-green-700' : stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                    {stock > 5 ? 'Норма' : stock > 0 ? 'Мало' : 'Пусто'}
+                                 </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                 <div className="flex justify-end gap-2">
+                                    <button 
+                                       onClick={() => handleUpdateStock(p.id, -1)} 
+                                       title="Списать брак"
+                                       className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 flex items-center gap-1"
+                                    >
+                                       <Icon icon="solar:fire-bold" /> Брак
+                                    </button>
+                                    <button className="p-2 text-slate-400 hover:text-primary bg-slate-50 rounded-lg">
+                                       <Icon icon="solar:history-bold" />
+                                    </button>
+                                 </div>
+                              </td>
+                           </tr>
+                        );
+                     })}
+                  </tbody>
+               </table>
+            </div>
+         )}
+
+         {/* DOCUMENTS MODE */}
+         {mode === 'documents' && (
+            <div className="space-y-4">
+               <div className="flex gap-2 overflow-x-auto pb-2">
+                  {[
+                     { id: 'all', label: 'Все' },
+                     { id: 'income', label: 'Приход' },
+                     { id: 'writeoff', label: 'Списания' },
+                     { id: 'transfer', label: 'Перемещения' }
+                  ].map(tab => (
+                     <button 
+                        key={tab.id}
+                        onClick={() => setDocType(tab.id as any)}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${docType === tab.id ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+                     >
+                        {tab.label}
+                     </button>
                   ))}
-               </tbody>
-            </table>
-         </div>
+               </div>
+
+               <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[800px]">
+                     <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                           <th className="p-4">№ Документа</th>
+                           <th className="p-4">Тип</th>
+                           <th className="p-4">Дата</th>
+                           <th className="p-4">Контрагент / Причина</th>
+                           <th className="p-4">Сумма</th>
+                           <th className="p-4">Товаров</th>
+                           <th className="p-4">Статус</th>
+                           <th className="p-4">Действия</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                        {MOCK_WAREHOUSE_DOCUMENTS.filter(d => docType === 'all' || d.type === docType).map(doc => (
+                           <tr key={doc.id} className="hover:bg-slate-50">
+                              <td className="p-4 font-mono font-bold text-slate-800">{doc.id}</td>
+                              <td className="p-4">
+                                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                    doc.type === 'income' ? 'bg-green-100 text-green-700' :
+                                    doc.type === 'writeoff' ? 'bg-red-100 text-red-700' :
+                                    'bg-blue-100 text-blue-700'
+                                 }`}>
+                                    {doc.type === 'income' ? 'Приход' : doc.type === 'writeoff' ? 'Списание' : 'Перемещение'}
+                                 </span>
+                              </td>
+                              <td className="p-4 text-slate-500">{doc.date}</td>
+                              <td className="p-4">
+                                 <div className="font-bold text-slate-800">{doc.supplierName || '-'}</div>
+                                 <div className="text-xs text-slate-400">{doc.comment}</div>
+                              </td>
+                              <td className="p-4 font-bold">{doc.totalAmount} с.</td>
+                              <td className="p-4">{doc.itemCount} шт.</td>
+                              <td className="p-4">
+                                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${doc.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                                    {doc.status === 'completed' ? 'Проведен' : 'Черновик'}
+                                 </span>
+                              </td>
+                              <td className="p-4 flex gap-2">
+                                 <button className="text-slate-400 hover:text-primary"><Icon icon="solar:eye-bold" /></button>
+                                 <button className="text-slate-400 hover:text-primary"><Icon icon="solar:printer-bold" /></button>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         )}
       </div>
    );
 };
@@ -1899,7 +2061,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case 'overview': return <OverviewView products={products} orders={orders} customers={customers} employees={employees} />;
       case 'orders': return <KanbanBoard orders={orders} onUpdateStatus={() => {}} />; 
       case 'tables': return <TablesView employees={employees} orders={orders} />; 
-      case 'warehouse': return <WarehouseView />; 
+      case 'warehouse': return <WarehouseView products={products} setProducts={setProducts} />; 
       case 'fitting': return <FittingRoomView bookings={bookings} />;
       case 'products': return <ProductsView products={products} setProducts={setProducts} categories={categories} suppliers={suppliers} />;
       case 'approval': return <ProductApprovalView products={products} />; // Added
