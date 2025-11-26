@@ -162,7 +162,12 @@ export interface Order {
   verificationCode?: string; // 4-6 digit code for delivery
   courierId?: string;
   clientConfirmed?: boolean; // Option C: Client confirmed via button
-  internalNotes?: string; // NEW: For admin comments
+  
+  // CRM Features
+  internalNotes?: string; // Simple notes
+  tags?: string[]; // ['urgent', 'vip', 'gift']
+  managerNotes?: { author: string; text: string; date: string }[]; // Chat
+  history?: { status: string; date: string; description: string; icon?: string }[]; // Detailed timeline
 }
 
 export interface ChatMessage {

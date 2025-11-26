@@ -300,7 +300,13 @@ export const MOCK_ORDERS: Order[] = [
        { ...MOCK_PRODUCTS[0], quantity: 1, selectedSize: 'M', selectedColor: 'Черный', pickedStatus: 'pending' } as any
     ],
     tableId: 'tbl-1',
-    verificationCode: '4590'
+    verificationCode: '4590',
+    tags: ['vip', 'gift'],
+    managerNotes: [{ author: 'Рустам', text: 'Клиент просил позвонить перед выездом', date: '10:30' }],
+    history: [
+       { status: 'new', date: '14:30', description: 'Заказ создан', icon: 'solar:star-bold' },
+       { status: 'info', date: '14:31', description: 'SMS отправлено', icon: 'solar:chat-round-dots-bold' }
+    ]
   },
   {
     id: 'ORD-7781',
@@ -315,7 +321,12 @@ export const MOCK_ORDERS: Order[] = [
     items: [
        { ...MOCK_PRODUCTS[1], quantity: 1, selectedSize: 'S', selectedColor: 'Белый', pickedStatus: 'picked' } as any
     ],
-    verificationCode: '1122'
+    verificationCode: '1122',
+    tags: [],
+    history: [
+       { status: 'new', date: '10:00', description: 'Заказ создан', icon: 'solar:star-bold' },
+       { status: 'delivered', date: '12:30', description: 'Заказ выдан', icon: 'solar:check-circle-bold' }
+    ]
   },
   {
     id: 'ORD-7780',
@@ -332,7 +343,13 @@ export const MOCK_ORDERS: Order[] = [
        { ...MOCK_PRODUCTS[7], quantity: 1, selectedSize: '42', selectedColor: 'Коричневый', pickedStatus: 'picked' } as any
     ],
     courierId: 'emp-3',
-    verificationCode: '3388'
+    verificationCode: '3388',
+    tags: ['urgent'],
+    history: [
+       { status: 'new', date: '09:00', description: 'Заказ создан', icon: 'solar:star-bold' },
+       { status: 'processing', date: '09:30', description: 'Сборка завершена', icon: 'solar:box-minimalistic-bold' },
+       { status: 'shipped', date: '10:15', description: 'Курьер забрал заказ', icon: 'solar:bicycling-bold' }
+    ]
   }
 ];
 

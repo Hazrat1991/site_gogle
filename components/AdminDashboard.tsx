@@ -1220,71 +1220,225 @@ const LogsView: React.FC = () => (
 
 // --- NEW VIEWS FOR TABLES & WAREHOUSE ---
 
-const TablesView: React.FC = () => {
+const TablesView: React.FC<{ 
+  employees: EmployeeExtended[], 
+  orders: Order[] 
+}> = ({ employees, orders }) => {
    const [tables, setTables] = useState<PackingTable[]>(MOCK_PACKING_TABLES);
-   
+   const [activeTable, setActiveTable] = useState<PackingTable | null>(null);
+   const [isEditOpen, setIsEditOpen] = useState(false);
+   const [currentTable, setCurrentTable] = useState<Partial<PackingTable>>({});
+
+   const handleSave = () => {
+      if (currentTable.id) {
+         setTables(tables.map(t => t.id === currentTable.id ? { ...t, ...currentTable } as PackingTable : t));
+      } else {
+         const newTable: PackingTable = {
+            id: `tbl-${Date.now()}`,
+            name: currentTable.name || 'New Table',
+            supervisorId: currentTable.supervisorId || '',
+            supervisorName: employees.find(e => e.id === currentTable.supervisorId)?.fullName || 'Unknown',
+            status: 'active',
+            currentOrderIds: [],
+            totalOrdersProcessed: 0
+         };
+         setTables([...tables, newTable]);
+      }
+      setIsEditOpen(false);
+   };
+
+   const handleDelete = (id: string) => {
+      if(confirm('Удалить этот стол?')) {
+         setTables(tables.filter(t => t.id !== id));
+      }
+   };
+
+   if (activeTable) {
+      // WORKSTATION MODE
+      return (
+         <div className="space-y-4 animate-fade-in h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+               <button onClick={() => setActiveTable(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                  <Icon icon="solar:arrow-left-linear" className="size-6" />
+               </button>
+               <div>
+                  <h2 className="text-xl font-bold">{activeTable.name}</h2>
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                     <Icon icon="solar:user-id-bold" className="size-4" />
+                     {activeTable.supervisorName}
+                  </div>
+               </div>
+               <div className="ml-auto flex gap-3">
+                  <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm flex items-center gap-2">
+                     <Icon icon="solar:box-bold" />
+                     В очереди: {activeTable.currentOrderIds.length}
+                  </div>
+                  <div className="px-4 py-2 bg-green-50 text-green-700 rounded-xl font-bold text-sm flex items-center gap-2">
+                     <Icon icon="solar:check-circle-bold" />
+                     Собрано: {activeTable.totalOrdersProcessed}
+                  </div>
+               </div>
+            </div>
+
+            {/* Workstation Content */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+               {/* Left: Queue */}
+               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 font-bold text-slate-700">Очередь заказов</div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                     {activeTable.currentOrderIds.map(oid => {
+                        const order = orders.find(o => o.id === oid) || { id: oid, customerName: 'Unknown', items: [] };
+                        return (
+                           <div key={oid} className="p-3 border border-slate-100 rounded-xl hover:bg-slate-50 cursor-pointer group">
+                              <div className="flex justify-between mb-1">
+                                 <span className="font-bold text-sm">{oid}</span>
+                                 <span className="text-xs font-bold text-orange-500">Express</span>
+                              </div>
+                              <div className="text-xs text-slate-500 mb-2">{(order as Order).customerName}</div>
+                              <div className="flex gap-1">
+                                 {(order as Order).items?.slice(0, 4).map((item, i) => (
+                                    <div key={i} className={`size-8 rounded-md border flex items-center justify-center ${item.pickedStatus === 'picked' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-red-50 border-red-100 text-red-300'}`}>
+                                       <Icon icon="solar:t-shirt-bold" className="size-4" />
+                                    </div>
+                                 ))}
+                              </div>
+                           </div>
+                        )
+                     })}
+                     <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm hover:border-primary hover:text-primary transition-colors">
+                        + Сканировать заказ
+                     </button>
+                  </div>
+               </div>
+
+               {/* Right: Active Workspace */}
+               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+                  {/* Active Order Detail Mockup */}
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                     <Icon icon="solar:box-minimalistic-bold" className="size-24 opacity-20 mb-4" />
+                     <p>Выберите заказ из очереди или сканируйте штрих-код</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      );
+   }
+
+   // OVERVIEW MODE
    return (
-      <div className="space-y-4 animate-fade-in">
+      <div className="space-y-6 animate-fade-in">
+         {/* Modal */}
+         {isEditOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+               <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <h3 className="text-xl font-bold mb-4">{currentTable.id ? 'Редактировать стол' : 'Новый стол'}</h3>
+                  <div className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Название</label>
+                        <input type="text" className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.name || ''} onChange={e => setCurrentTable({...currentTable, name: e.target.value})} />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Ответственный</label>
+                        <select className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.supervisorId || ''} onChange={e => setCurrentTable({...currentTable, supervisorId: e.target.value})}>
+                           <option value="">Выберите сотрудника</option>
+                           {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+                        </select>
+                     </div>
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">Статус</label>
+                        <select className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.status || 'active'} onChange={e => setCurrentTable({...currentTable, status: e.target.value as any})}>
+                           <option value="active">Активен</option>
+                           <option value="busy">Занят (Перегруз)</option>
+                           <option value="closed">Закрыт</option>
+                        </select>
+                     </div>
+                     <div className="flex gap-2 pt-2">
+                        <button onClick={() => setIsEditOpen(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-600">Отмена</button>
+                        <button onClick={handleSave} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Сохранить</button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         )}
+
          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Столы упаковки (Сборка)</h2>
-            <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-               <Icon icon="solar:add-circle-bold" />
+            <div>
+               <h2 className="text-2xl font-bold text-slate-800">Столы упаковки</h2>
+               <p className="text-sm text-slate-500">Управление зоной комплектации заказов</p>
+            </div>
+            <button 
+               onClick={() => { setCurrentTable({}); setIsEditOpen(true); }}
+               className="bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 hover:scale-105 transition-transform"
+            >
+               <Icon icon="solar:add-circle-bold" className="size-5" />
                Добавить стол
             </button>
          </div>
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tables.map(table => (
-               <div key={table.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative group">
-                  <div className="flex justify-between items-start mb-4">
+               <div key={table.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative group hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-6">
                      <div>
-                        <h3 className="text-xl font-bold text-slate-800">{table.name}</h3>
-                        <div className="text-xs text-slate-500 font-medium">ID: {table.id}</div>
+                        <div className="flex items-center gap-2 mb-1">
+                           <h3 className="text-xl font-black text-slate-800">{table.name}</h3>
+                           <div className={`size-3 rounded-full ${table.status === 'active' ? 'bg-green-500 animate-pulse' : table.status === 'busy' ? 'bg-red-500' : 'bg-slate-300'}`}></div>
+                        </div>
+                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{table.status === 'active' ? 'Активен' : table.status === 'busy' ? 'Перегружен' : 'Закрыт'}</div>
                      </div>
-                     <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase ${table.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {table.status}
-                     </span>
-                  </div>
-
-                  <div className="space-y-4">
-                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <div className="text-xs text-slate-400 font-bold uppercase mb-1">Старший смены</div>
-                        <div className="flex items-center gap-2">
-                           <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">
-                              {table.supervisorName[0]}
-                           </div>
-                           <span className="font-bold text-sm">{table.supervisorName}</span>
-                        </div>
-                     </div>
-
-                     <div className="flex gap-2">
-                        <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
-                           <div className="text-xs text-slate-400 font-bold uppercase mb-1">Заказы</div>
-                           <div className="text-xl font-bold text-primary">{table.currentOrderIds.length}</div>
-                        </div>
-                        <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
-                           <div className="text-xs text-slate-400 font-bold uppercase mb-1">Всего</div>
-                           <div className="text-xl font-bold text-slate-800">{table.totalOrdersProcessed}</div>
-                        </div>
+                     <div className="flex gap-1">
+                        <button onClick={() => { setCurrentTable(table); setIsEditOpen(true); }} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+                           <Icon icon="solar:pen-bold" />
+                        </button>
+                        <button onClick={() => handleDelete(table.id)} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors">
+                           <Icon icon="solar:trash-bin-trash-bold" />
+                        </button>
                      </div>
                   </div>
 
-                  <div className="mt-6 flex gap-2">
-                     <button className="flex-1 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-slate-700 transition-colors">
-                        Назначить заказ
-                     </button>
-                     <button className="size-10 flex items-center justify-center bg-slate-100 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-50">
-                        <Icon icon="solar:trash-bin-trash-bold" />
-                     </button>
+                  <div className="space-y-4 mb-6">
+                     <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3 border border-slate-100">
+                        <div className="size-10 rounded-full bg-white flex items-center justify-center font-bold text-slate-500 border border-slate-200 shadow-sm">
+                           {table.supervisorName[0]}
+                        </div>
+                        <div>
+                           <div className="text-xs text-slate-400 font-bold uppercase">Супервайзер</div>
+                           <div className="font-bold text-sm text-slate-800">{table.supervisorName}</div>
+                        </div>
+                     </div>
+
+                     <div>
+                        <div className="flex justify-between text-xs font-bold mb-2">
+                           <span className="text-slate-500">Загрузка ({table.currentOrderIds.length})</span>
+                           <span className={table.currentOrderIds.length > 5 ? 'text-red-500' : 'text-green-500'}>{table.currentOrderIds.length > 5 ? 'Высокая' : 'Норма'}</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                           <div className={`h-full rounded-full ${table.currentOrderIds.length > 5 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${Math.min(100, table.currentOrderIds.length * 10)}%`}}></div>
+                        </div>
+                     </div>
                   </div>
+
+                  <button 
+                     onClick={() => setActiveTable(table)}
+                     className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+                  >
+                     <Icon icon="solar:monitor-bold" />
+                     Открыть терминал
+                  </button>
                </div>
             ))}
             
-            {/* Add Table Placeholder */}
-            <div className="border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-primary hover:text-primary hover:bg-slate-50 transition-all cursor-pointer h-full min-h-[200px]">
-               <Icon icon="solar:add-circle-bold" className="size-10 mb-2" />
-               <span className="font-bold">Добавить новый стол</span>
-            </div>
+            {/* Add Placeholder */}
+            <button 
+               onClick={() => { setCurrentTable({}); setIsEditOpen(true); }}
+               className="border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-primary hover:text-primary hover:bg-orange-50/50 transition-all cursor-pointer min-h-[280px]"
+            >
+               <div className="size-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
+                  <Icon icon="solar:add-circle-bold" className="size-8" />
+               </div>
+               <span className="font-bold text-lg">Добавить стол</span>
+            </button>
          </div>
       </div>
    );
@@ -1744,7 +1898,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     switch(activeView) {
       case 'overview': return <OverviewView products={products} orders={orders} customers={customers} employees={employees} />;
       case 'orders': return <KanbanBoard orders={orders} onUpdateStatus={() => {}} />; 
-      case 'tables': return <TablesView />; 
+      case 'tables': return <TablesView employees={employees} orders={orders} />; 
       case 'warehouse': return <WarehouseView />; 
       case 'fitting': return <FittingRoomView bookings={bookings} />;
       case 'products': return <ProductsView products={products} setProducts={setProducts} categories={categories} suppliers={suppliers} />;
