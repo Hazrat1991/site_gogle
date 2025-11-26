@@ -255,1191 +255,703 @@ const ProductForm: React.FC<{
 // --- VIEW COMPONENTS ---
 
 const OverviewView: React.FC<{ products: Product[], orders: Order[], customers: Customer[], employees: EmployeeExtended[] }> = ({ products, orders, customers, employees }) => {
-  const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('day');
-
-  // --- LOGIC FOR KPIS & CHARTS ---
-  // In a real app, these would be calculated from backend data with real dates.
-  // Here we simulate values based on timeRange for demonstration.
-  
-  const multiplier = timeRange === 'day' ? 1 : timeRange === 'week' ? 5 : 20;
-  
-  const stats = {
-     revenue: 15400 * multiplier,
-     revenueGrowth: 12,
-     ordersCount: 24 * multiplier,
-     avgCheck: Math.round(15400 / 24),
-     profit: (15400 * 0.35) * multiplier, // Assuming 35% margin
-     profitGrowth: 8,
-  };
-
-  // Mock data for charts
-  const salesData = timeRange === 'day' 
-     ? [1200, 2400, 1800, 3200, 4500, 2100, 15400] // Hourly-ish
-     : timeRange === 'week'
-     ? [15000, 18000, 12000, 22000, 25000, 30000, 15400] // Daily
-     : [120000, 150000, 180000, 200000]; // Weekly
-
+  const todaysOrders = orders.filter(o => o.date === new Date().toLocaleDateString()).length;
+  const revenueToday = 15400; // Mock
   const activeCouriers = employees.filter(e => e.role === 'courier' && e.status === 'working').length;
-  const topProducts = products.filter(p => p.isTop).slice(0, 4);
   
-  // Action Items Logic
-  const lowStockCount = products.filter(p => (p.stock || 0) < 5).length;
-  const pendingOrders = orders.filter(o => o.status === 'new' || o.status === 'processing').length;
-  const returnsCount = 2; // Mock
-
-  const KPICard = ({ title, value, subtext, icon, color, bg, chartData }: any) => (
-     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden flex flex-col justify-between h-full">
-        <div className="flex justify-between items-start mb-2">
-           <div className={`size-10 rounded-xl ${bg} ${color} flex items-center justify-center`}>
-              <Icon icon={icon} className="size-5" />
-           </div>
-           {subtext && (
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${subtext.includes('+') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                 {subtext}
-              </span>
-           )}
-        </div>
-        <div>
-           <div className="text-slate-400 text-xs font-bold uppercase mb-1">{title}</div>
-           <div className="text-2xl font-black text-slate-800">{value}</div>
-        </div>
-        {chartData && (
-           <div className="absolute bottom-0 right-0 w-1/2 h-12 opacity-20">
-              <SimpleLineChart data={chartData} color={color.replace('text-', '').replace('-600', '') === 'green' ? '#16a34a' : '#F97316'} />
-           </div>
-        )}
-     </div>
-  );
-
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-             <h2 className="text-2xl font-bold text-slate-800">Обзор</h2>
-             <p className="text-sm text-slate-500">Сводка ключевых показателей эффективности</p>
-          </div>
-          <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-             {['day', 'week', 'month'].map((r) => (
-                <button 
-                   key={r}
-                   onClick={() => setTimeRange(r as any)}
-                   className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                      timeRange === r ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-                   }`}
-                >
-                   {r === 'day' ? 'Сегодня' : r === 'week' ? 'Неделя' : 'Месяц'}
-                </button>
-             ))}
-          </div>
-       </div>
-       
-       {/* 1. KPI Grid */}
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard 
-             title="Выручка" 
-             value={`${stats.revenue.toLocaleString()} с.`} 
-             subtext={`+${stats.revenueGrowth}%`} 
-             icon="solar:wallet-money-bold" 
-             color="text-green-600" bg="bg-green-50"
-             chartData={salesData}
-          />
-          <KPICard 
-             title="Заказы" 
-             value={stats.ordersCount} 
-             subtext="+5" 
-             icon="solar:bag-check-bold" 
-             color="text-blue-600" bg="bg-blue-50"
-          />
-          <KPICard 
-             title="Чистая прибыль" 
-             value={`${Math.round(stats.profit).toLocaleString()} с.`} 
-             subtext={`+${stats.profitGrowth}%`} 
-             icon="solar:chart-square-bold" 
-             color="text-purple-600" bg="bg-purple-50"
-          />
-          <KPICard 
-             title="Средний чек" 
-             value={`${stats.avgCheck} с.`} 
-             subtext="-2%" 
-             icon="solar:bill-list-bold" 
-             color="text-orange-600" bg="bg-orange-50"
-          />
-       </div>
-
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 2. Main Chart Area */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-lg text-slate-800">Динамика продаж</h3>
-                <button className="text-slate-400 hover:text-primary"><Icon icon="solar:menu-dots-bold" /></button>
-             </div>
-             <div className="h-64 w-full flex items-end gap-2">
-                {/* Simple Bar Chart Simulation */}
-                {salesData.map((val, i) => {
-                   const height = (val / Math.max(...salesData)) * 100;
-                   return (
-                      <div key={i} className="flex-1 flex flex-col justify-end group cursor-pointer">
-                         <div className="text-[10px] text-center text-slate-500 opacity-0 group-hover:opacity-100 mb-1 font-bold">{val}</div>
-                         <div 
-                           className="w-full bg-primary/80 rounded-t-lg hover:bg-primary transition-all relative"
-                           style={{ height: `${height}%` }}
-                         ></div>
-                      </div>
-                   )
-                })}
-             </div>
-             <div className="flex justify-between mt-4 text-xs text-slate-400 font-bold uppercase">
-                {timeRange === 'day' 
-                   ? ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00'].map(t => <span key={t}>{t}</span>)
-                   : ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(t => <span key={t}>{t}</span>)
-                }
-             </div>
-          </div>
-
-          {/* 3. Action Center & Alerts */}
-          <div className="space-y-6">
-             {/* Action Needed */}
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-red-600">
-                   <Icon icon="solar:bell-bing-bold" />
-                   Требует внимания
-                </h3>
-                <div className="space-y-3">
-                   <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-                      <div className="flex items-center gap-3">
-                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm">
-                            <Icon icon="solar:box-bold" />
-                         </div>
-                         <span className="text-sm font-bold text-slate-700">Новые заказы</span>
-                      </div>
-                      <span className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-bold">{pendingOrders}</span>
-                   </div>
-
-                   <div className="flex justify-between items-center p-3 bg-red-50 rounded-xl border border-red-100">
-                      <div className="flex items-center gap-3">
-                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-red-600 shadow-sm">
-                            <Icon icon="solar:danger-circle-bold" />
-                         </div>
-                         <span className="text-sm font-bold text-slate-700">Заканчивается</span>
-                      </div>
-                      <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{lowStockCount}</span>
-                   </div>
-
-                   <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
-                      <div className="flex items-center gap-3">
-                         <div className="size-8 bg-white rounded-full flex items-center justify-center text-orange-600 shadow-sm">
-                            <Icon icon="solar:restart-bold" />
-                         </div>
-                         <span className="text-sm font-bold text-slate-700">Возвраты</span>
-                      </div>
-                      <span className="bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-bold">{returnsCount}</span>
-                   </div>
-                </div>
-             </div>
-
-             {/* Logistics Status */}
-             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-lg mb-4">Логистика</h3>
-                <div className="flex items-center justify-between mb-4">
-                   <div className="text-sm text-slate-500">Активных курьеров</div>
-                   <div className="font-bold text-slate-800 flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-green-500 animate-pulse"></span>
-                      {activeCouriers} чел.
-                   </div>
-                </div>
-                <div className="bg-slate-100 rounded-xl p-4 text-center">
-                   <div className="text-2xl font-black text-slate-800 mb-1">12 мин</div>
-                   <div className="text-xs text-slate-500 font-bold uppercase">Среднее время доставки</div>
-                </div>
-             </div>
-          </div>
-       </div>
-
-       {/* 4. Recent Lists Grid */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg">Последние заказы</h3>
-                <button className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">Все заказы</button>
-             </div>
-             <div className="space-y-3">
-                {orders.slice(0, 4).map(order => (
-                   <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                         <div className="size-10 rounded-full bg-white flex items-center justify-center font-bold text-slate-500 text-xs shadow-sm">
-                            {order.id.slice(-3)}
-                         </div>
-                         <div>
-                            <div className="font-bold text-slate-800 text-sm">{order.customerName}</div>
-                            <div className="text-[10px] text-slate-400">{order.items.length} товаров • {order.date}</div>
-                         </div>
-                      </div>
-                      <div className="text-right">
-                         <div className="font-bold text-slate-800 text-sm">{order.total} c.</div>
-                         <div className={`text-[10px] font-bold uppercase ${
-                            order.status === 'new' ? 'text-blue-600' : 
-                            order.status === 'delivered' ? 'text-green-600' : 'text-orange-600'
-                         }`}>{order.status}</div>
-                      </div>
-                   </div>
-                ))}
-             </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <h3 className="font-bold text-lg mb-4">Топ товары</h3>
-             <div className="space-y-4">
-                {topProducts.map((p, i) => (
-                   <div key={p.id} className="flex items-center gap-3 border-b border-slate-50 pb-3 last:border-0 last:pb-0">
-                      <div className="size-6 bg-slate-800 text-white rounded-lg flex items-center justify-center text-[10px] font-bold">{i + 1}</div>
-                      <img src={p.images[0]} className="size-12 rounded-lg object-cover bg-slate-100" />
-                      <div className="flex-1 min-w-0">
-                         <div className="text-sm font-bold text-slate-800 truncate">{p.name}</div>
-                         <div className="text-xs text-slate-400">Остаток: {p.stock} шт.</div>
-                      </div>
-                      <div className="text-right">
-                         <div className="text-sm font-bold text-green-600">{p.price} с.</div>
-                         <div className="text-[10px] text-slate-400">{Math.floor(Math.random() * 50) + 10} продаж</div>
-                      </div>
-                   </div>
-                ))}
-             </div>
-          </div>
-       </div>
+    <div className="space-y-6 animate-fade-in">
+        <h2 className="text-2xl font-bold">Обзор</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-2">Выручка сегодня</div>
+                <div className="text-2xl font-black text-slate-800">{revenueToday} с.</div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-2">Заказов</div>
+                <div className="text-2xl font-black text-slate-800">{todaysOrders + 5}</div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="text-xs font-bold text-slate-400 uppercase mb-2">Курьеры</div>
+                <div className="text-2xl font-black text-slate-800">{activeCouriers} на линии</div>
+            </div>
+        </div>
     </div>
   );
 };
 
-const ProductsView: React.FC<{ 
-  products: Product[], 
-  setProducts: (p: Product[]) => void, 
-  categories: Category[], 
-  suppliers: Supplier[] 
-}> = ({ products, setProducts, categories, suppliers }) => {
-   const [searchQuery, setSearchQuery] = useState('');
-   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-   const [filterCategory, setFilterCategory] = useState('all');
-   const [filterStatus, setFilterStatus] = useState('all');
-   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-   const [isFormOpen, setIsFormOpen] = useState(false);
+const TablesView: React.FC<{ employees: EmployeeExtended[], orders: Order[] }> = ({ employees, orders }) => (
+  <div className="space-y-6 animate-fade-in">
+    <h2 className="text-2xl font-bold">Столы сборки</h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {MOCK_PACKING_TABLES.map(table => (
+        <div key={table.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-xl font-bold text-slate-800">{table.name}</h3>
+            <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${table.status === 'active' ? 'bg-green-100 text-green-700' : table.status === 'busy' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
+              {table.status}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mb-4">
+             <div className="size-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500">
+                {table.supervisorName[0]}
+             </div>
+             <div>
+                <div className="font-bold text-sm">{table.supervisorName}</div>
+                <div className="text-xs text-slate-400">Супервайзер</div>
+             </div>
+          </div>
+          <div className="bg-slate-50 p-3 rounded-xl text-center">
+             <div className="text-xs text-slate-400 uppercase font-bold mb-1">Обработано заказов</div>
+             <div className="text-2xl font-black text-slate-800">{table.totalOrdersProcessed}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
-   // KPIs
-   const totalProducts = products.length;
-   const totalValue = products.reduce((acc, p) => acc + (p.price * (p.stock || 0)), 0);
-   const lowStockCount = products.filter(p => (p.stock || 0) < 5).length;
-   
-   // Computed Products
-   const filteredProducts = useMemo(() => {
-      let result = products;
-      if (searchQuery) {
-         const q = searchQuery.toLowerCase();
-         result = result.filter(p => p.name.toLowerCase().includes(q) || String(p.id).includes(q));
-      }
-      if (filterCategory !== 'all') {
-         result = result.filter(p => p.category === filterCategory);
-      }
-      if (filterStatus === 'in_stock') {
-         result = result.filter(p => (p.stock || 0) > 0);
-      } else if (filterStatus === 'out_of_stock') {
-         result = result.filter(p => (p.stock || 0) === 0);
-      }
-      return result;
-   }, [products, searchQuery, filterCategory, filterStatus]);
+const ProductsView: React.FC<{ products: Product[], setProducts: (p: Product[]) => void, categories: Category[], suppliers: Supplier[] }> = ({ products, setProducts, categories, suppliers }) => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-   const toggleSelect = (id: number) => {
-      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-   };
+  const handleSave = (product: Product) => {
+    if (editingProduct) {
+      setProducts(products.map(p => p.id === product.id ? product : p));
+    } else {
+      setProducts([product, ...products]);
+    }
+    setIsFormOpen(false);
+    setEditingProduct(null);
+  };
 
-   const toggleSelectAll = () => {
-      if (selectedIds.length === filteredProducts.length) {
-         setSelectedIds([]);
-      } else {
-         setSelectedIds(filteredProducts.map(p => p.id));
-      }
-   };
-
-   const handleDeleteSelected = () => {
-      if (confirm(`Удалить ${selectedIds.length} товаров?`)) {
-         setProducts(products.filter(p => !selectedIds.includes(p.id)));
-         setSelectedIds([]);
-      }
-   };
-
-   const handleSaveProduct = (product: Product) => {
-      if (editingProduct) {
-         setProducts(products.map(p => p.id === product.id ? product : p));
-      } else {
-         setProducts([product, ...products]);
-      }
-      setIsFormOpen(false);
-      setEditingProduct(null);
-   };
-
-   const KPICard = ({ icon, title, value, color, bg }: any) => (
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-         <div className={`size-12 rounded-xl flex items-center justify-center ${bg} ${color}`}>
-            <Icon icon={icon} className="size-6" />
-         </div>
-         <div>
-            <div className="text-xs font-bold text-slate-400 uppercase">{title}</div>
-            <div className="text-2xl font-black text-slate-800">{value}</div>
-         </div>
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {isFormOpen && (
+        <ProductForm 
+          product={editingProduct} 
+          onSave={handleSave} 
+          onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }} 
+          categories={categories}
+          suppliers={suppliers}
+        />
+      )}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Товары</h2>
+        <button onClick={() => setIsFormOpen(true)} className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить товар</button>
       </div>
-   );
-
-   return (
-      <div className="space-y-6 animate-fade-in pb-10">
-         {isFormOpen && (
-            <ProductForm 
-               product={editingProduct} 
-               onSave={handleSaveProduct} 
-               onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }}
-               categories={categories}
-               suppliers={suppliers}
-            />
-         )}
-
-         {/* 1. KPI Cards */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard icon="solar:t-shirt-bold" title="Всего товаров" value={totalProducts} color="text-blue-600" bg="bg-blue-50" />
-            <KPICard icon="solar:wallet-money-bold" title="На складе (Цена)" value={`${(totalValue / 1000).toFixed(1)}k c.`} color="text-green-600" bg="bg-green-50" />
-            <KPICard icon="solar:danger-circle-bold" title="Низкий остаток" value={lowStockCount} color="text-red-500" bg="bg-red-50" />
-            <KPICard icon="solar:layers-bold" title="Категорий" value={categories.length} color="text-purple-600" bg="bg-purple-50" />
-         </div>
-
-         {/* 2. Toolbar */}
-         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-               <div className="relative group w-full md:w-64">
-                  <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
-                  <input 
-                     type="text" 
-                     placeholder="Название, артикул..." 
-                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary transition-all"
-                     value={searchQuery}
-                     onChange={e => setSearchQuery(e.target.value)}
-                  />
-               </div>
-               <select 
-                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:border-primary cursor-pointer"
-                  value={filterCategory}
-                  onChange={e => setFilterCategory(e.target.value)}
-               >
-                  <option value="all">Все категории</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-               </select>
-               <select 
-                  className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:border-primary cursor-pointer"
-                  value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value)}
-               >
-                  <option value="all">Любой статус</option>
-                  <option value="in_stock">В наличии</option>
-                  <option value="out_of_stock">Нет в наличии</option>
-               </select>
-            </div>
-            
-            <div className="flex gap-3 w-full md:w-auto">
-               <button 
-                  onClick={() => { setEditingProduct(null); setIsFormOpen(true); }}
-                  className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 hover:bg-primary/90 transition-colors active:scale-95"
-               >
-                  <Icon icon="solar:add-circle-bold" />
-                  Добавить
-               </button>
-            </div>
-         </div>
-
-         {/* 3. Bulk Actions Bar */}
-         {selectedIds.length > 0 && (
-            <div className="bg-slate-900 text-white p-3 rounded-xl flex justify-between items-center animate-fade-in shadow-lg">
-               <div className="flex items-center gap-4 px-2">
-                  <span className="font-bold text-sm">Выбрано: {selectedIds.length}</span>
-                  <div className="h-4 w-px bg-slate-700"></div>
-                  <button className="text-xs font-bold hover:text-slate-300">Изменить статус</button>
-               </div>
-               <button 
-                  onClick={handleDeleteSelected}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"
-               >
-                  <Icon icon="solar:trash-bin-trash-bold" />
-                  Удалить
-               </button>
-            </div>
-         )}
-
-         {/* 4. Products Table */}
-         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[900px]">
-               <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-100">
-                  <tr>
-                     <th className="p-4 w-10">
-                        <input type="checkbox" className="size-4 accent-primary cursor-pointer" checked={selectedIds.length === filteredProducts.length && filteredProducts.length > 0} onChange={toggleSelectAll} />
-                     </th>
-                     <th className="p-4">Товар</th>
-                     <th className="p-4">Цена / Закуп</th>
-                     <th className="p-4 w-48">Склад</th>
-                     <th className="p-4">Категория</th>
-                     <th className="p-4">Поставщик</th>
-                     <th className="p-4">Статус</th>
-                     <th className="p-4 text-right">Действия</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-50">
-                  {filteredProducts.map(p => {
-                     const isSelected = selectedIds.includes(p.id);
-                     const stock = p.stock || 0;
-                     const maxStock = 20; 
-                     const stockPercent = Math.min(100, (stock / maxStock) * 100);
-                     const stockColor = stock === 0 ? 'bg-slate-200' : stock < 5 ? 'bg-red-500' : 'bg-green-500';
-
-                     return (
-                        <tr key={p.id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                           <td className="p-4">
-                              <input type="checkbox" className="size-4 accent-primary cursor-pointer" checked={isSelected} onChange={() => toggleSelect(p.id)} />
-                           </td>
-                           <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                 <div className="size-12 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                                    <img src={p.images[0]} className="w-full h-full object-cover" alt={p.name} />
-                                 </div>
-                                 <div>
-                                    <div className="font-bold text-slate-800 line-clamp-1">{p.name}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: GM-{p.id}</div>
-                                 </div>
-                              </div>
-                           </td>
-                           <td className="p-4">
-                              <div className="font-bold text-slate-800">{p.price} с.</div>
-                              <div className="text-[10px] text-slate-400">Закуп: {p.buyPrice || '-'} с.</div>
-                           </td>
-                           <td className="p-4">
-                              <div className="flex items-center gap-2 mb-1">
-                                 <span className={`text-xs font-bold ${stock < 5 ? 'text-red-500' : 'text-slate-700'}`}>{stock} шт.</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                 <div className={`h-full rounded-full ${stockColor}`} style={{ width: `${stockPercent}%` }}></div>
-                              </div>
-                           </td>
-                           <td className="p-4 text-slate-600 font-medium capitalize">
-                              {p.category}
-                           </td>
-                           <td className="p-4 text-xs text-slate-500">
-                              {suppliers.find(s => s.id === p.supplierId)?.name || 'Собственный'}
-                           </td>
-                           <td className="p-4">
-                              <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                 {stock > 0 ? 'В наличии' : 'Нет на складе'}
-                              </span>
-                           </td>
-                           <td className="p-4 text-right">
-                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <button 
-                                    onClick={() => { setEditingProduct(p); setIsFormOpen(true); }}
-                                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500"
-                                 >
-                                    <Icon icon="solar:pen-bold" />
-                                 </button>
-                                 <button 
-                                    onClick={() => {
-                                       if(confirm('Удалить товар?')) {
-                                          setProducts(products.filter(pr => pr.id !== p.id));
-                                       }
-                                    }}
-                                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-red-50 text-red-500"
-                                 >
-                                    <Icon icon="solar:trash-bin-trash-bold" />
-                                 </button>
-                              </div>
-                           </td>
-                        </tr>
-                     );
-                  })}
-               </tbody>
-            </table>
-         </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="p-4">Название</th>
+              <th className="p-4">Категория</th>
+              <th className="p-4">Цена</th>
+              <th className="p-4">Остаток</th>
+              <th className="p-4">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {products.map(p => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="p-4 font-bold text-slate-800">{p.name}</td>
+                <td className="p-4 text-slate-500">{p.category}</td>
+                <td className="p-4 font-bold">{p.price} с.</td>
+                <td className="p-4">{p.stock} шт.</td>
+                <td className="p-4">
+                  <button onClick={() => { setEditingProduct(p); setIsFormOpen(true); }} className="text-primary font-bold hover:underline">Ред.</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-   );
+    </div>
+  );
 };
+
+const CategoriesView: React.FC = () => (
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="text-2xl font-bold">Категории</h2>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {MOCK_CATEGORIES.map(cat => (
+        <div key={cat.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+           <img src={cat.image} className="w-full h-32 object-cover rounded-lg mb-3" />
+           <h3 className="font-bold text-lg">{cat.name}</h3>
+           <div className="text-xs text-slate-500">{cat.subcategories.length} подкатегорий</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const DepartmentsView: React.FC = () => (
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="text-2xl font-bold">Отделы</h2>
+    <div className="space-y-3">
+      {MOCK_DEPARTMENTS.map(dep => (
+        <div key={dep.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center">
+           <div>
+              <h3 className="font-bold text-lg">{dep.name}</h3>
+              <p className="text-sm text-slate-500">{dep.description}</p>
+           </div>
+           <div className="text-right">
+              <div className="text-2xl font-black text-slate-800">{dep.productCount}</div>
+              <div className="text-xs text-slate-400 uppercase font-bold">Товаров</div>
+           </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 const FinanceView: React.FC = () => (
   <div className="space-y-6 animate-fade-in">
-     <h2 className="text-2xl font-bold">Финансы</h2>
-     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg">
-           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Общий баланс</div>
-           <div className="text-3xl font-bold mb-4">124,500 с.</div>
-           <div className="flex gap-2">
-              <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs font-bold">+12%</span>
-              <span className="text-slate-400 text-xs flex items-center">за этот месяц</span>
-           </div>
+    <h2 className="text-2xl font-bold">Финансы</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+           <div className="text-xs font-bold text-slate-400 uppercase mb-1">Доход (мес)</div>
+           <div className="text-2xl font-black text-green-600">+45,200 с.</div>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Доходы</div>
-           <div className="text-3xl font-bold text-green-600 mb-4">+45,200 с.</div>
-           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full w-[70%] bg-green-500 rounded-full"></div>
-           </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+           <div className="text-xs font-bold text-slate-400 uppercase mb-1">Расход (мес)</div>
+           <div className="text-2xl font-black text-red-600">-12,500 с.</div>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-           <div className="text-slate-400 text-sm font-bold uppercase mb-2">Расходы</div>
-           <div className="text-3xl font-bold text-red-600 mb-4">-18,400 с.</div>
-           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full w-[30%] bg-red-500 rounded-full"></div>
-           </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+           <div className="text-xs font-bold text-slate-400 uppercase mb-1">Чистая прибыль</div>
+           <div className="text-2xl font-black text-slate-800">32,700 с.</div>
         </div>
-     </div>
-
-     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-        <h3 className="font-bold text-lg mb-4">Последние транзакции</h3>
-        <div className="space-y-4">
-           {[
-             { id: 1, title: 'Продажа #ORD-7782', date: 'Сегодня, 14:30', amount: '+1,200', type: 'in' },
-             { id: 2, title: 'Закупка товара (Asia Textile)', date: 'Вчера, 10:00', amount: '-5,400', type: 'out' },
-             { id: 3, title: 'Зарплата (Рустам А.)', date: '25 Окт, 09:00', amount: '-2,500', type: 'out' },
-             { id: 4, title: 'Продажа #ORD-7780', date: '24 Окт, 16:45', amount: '+2,890', type: 'in' },
-           ].map(t => (
-              <div key={t.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors">
-                 <div className="flex items-center gap-3">
-                    <div className={`size-10 rounded-full flex items-center justify-center ${t.type === 'in' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                       <Icon icon={t.type === 'in' ? "solar:arrow-left-down-bold" : "solar:arrow-right-up-bold"} />
-                    </div>
-                    <div>
-                       <div className="font-bold text-slate-800">{t.title}</div>
-                       <div className="text-xs text-slate-500">{t.date}</div>
-                    </div>
-                 </div>
-                 <div className={`font-bold ${t.type === 'in' ? 'text-green-600' : 'text-slate-800'}`}>
-                    {t.amount} c.
-                 </div>
-              </div>
-           ))}
-        </div>
-     </div>
+    </div>
+    {/* Mock Chart Placeholder */}
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-64 flex items-center justify-center">
+       <SimpleLineChart data={[10, 25, 15, 40, 35, 50, 45, 60, 55, 70]} />
+    </div>
   </div>
 );
 
 const CustomersView: React.FC<{ customers: Customer[] }> = ({ customers }) => (
   <div className="space-y-4 animate-fade-in">
-     <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Клиенты</h2>
-        <div className="flex gap-2">
-           <input type="text" placeholder="Поиск..." className="p-2 border rounded-xl text-sm w-64 bg-white" />
-           <button className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm">Экспорт</button>
-        </div>
-     </div>
-     
-     <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-        <table className="w-full text-left text-sm min-w-[800px]">
-           <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                 <th className="p-4">Клиент</th>
-                 <th className="p-4">Телефон</th>
-                 <th className="p-4">Заказов</th>
-                 <th className="p-4">Потрачено</th>
-                 <th className="p-4">Статус</th>
-                 <th className="p-4">Дата регистрации</th>
-              </tr>
-           </thead>
-           <tbody className="divide-y divide-slate-100">
-              {customers.map(c => (
-                 <tr key={c.id} className="hover:bg-slate-50">
-                    <td className="p-4 font-bold text-slate-800">{c.name}</td>
-                    <td className="p-4 text-slate-600">{c.phone}</td>
-                    <td className="p-4 font-bold">{c.ordersCount}</td>
-                    <td className="p-4 text-green-600 font-bold">{c.totalSpent} с.</td>
-                    <td className="p-4">
-                       <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {c.status}
-                       </span>
-                    </td>
-                    <td className="p-4 text-slate-500">{c.joinDate}</td>
-                 </tr>
-              ))}
-           </tbody>
-        </table>
-     </div>
-  </div>
-);
-
-const SettingsView: React.FC = () => (
-   <div className="space-y-6 animate-fade-in max-w-4xl">
-      <h2 className="text-2xl font-bold">Настройки магазина</h2>
-      
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-         <h3 className="font-bold text-lg border-b border-slate-100 pb-2">Общие</h3>
-         <div className="grid grid-cols-2 gap-4">
-            <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">Название магазина</label>
-               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="Grand Market" />
-            </div>
-            <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">Валюта</label>
-               <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <option>TJS (Сомони)</option>
-                  <option>USD (Dollar)</option>
-               </select>
-            </div>
-            <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">Телефон поддержки</label>
-               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="+992 900 00 00 00" />
-            </div>
-            <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
-               <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue="admin@grandmarket.tj" />
-            </div>
-         </div>
-
-         <h3 className="font-bold text-lg border-b border-slate-100 pb-2 pt-4">Оплата и Доставка</h3>
-         <div className="space-y-3">
-            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
-               <span className="font-bold text-slate-700">Принимать наличные</span>
-               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
-            </label>
-            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
-               <span className="font-bold text-slate-700">Принимать карты (POS-терминал)</span>
-               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
-            </label>
-            <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer">
-               <span className="font-bold text-slate-700">Бесплатная доставка от 500 с.</span>
-               <input type="checkbox" defaultChecked className="size-5 accent-primary" />
-            </label>
-         </div>
-
-         <div className="pt-4">
-            <button className="px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary/90">
-               Сохранить изменения
-            </button>
-         </div>
-      </div>
-   </div>
-);
-
-const FittingRoomView: React.FC<{ bookings: FittingBooking[] }> = ({ bookings }) => (
-   <div className="space-y-4 animate-fade-in">
-      <h2 className="text-2xl font-bold">Бронирование примерочной (VIP)</h2>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-         <table className="w-full text-left text-sm min-w-[700px]">
-            <thead className="bg-slate-50 text-slate-500">
-               <tr>
-                  <th className="p-4">Клиент</th>
-                  <th className="p-4">Дата / Время</th>
-                  <th className="p-4">Товаров</th>
-                  <th className="p-4">Статус</th>
-                  <th className="p-4">Действия</th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-               {bookings.map(b => (
-                  <tr key={b.id} className="hover:bg-slate-50">
-                     <td className="p-4">
-                        <div className="font-bold text-slate-800">{b.customerName}</div>
-                        <div className="text-xs text-slate-500">{b.customerPhone}</div>
-                     </td>
-                     <td className="p-4">
-                        <div className="font-bold text-primary">{b.timeSlot}</div>
-                        <div className="text-xs text-slate-500">{b.date}</div>
-                     </td>
-                     <td className="p-4">{b.items.length} шт.</td>
-                     <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${b.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                           {b.status}
-                        </span>
-                     </td>
-                     <td className="p-4">
-                        <button className="text-primary font-bold text-xs hover:underline">Подготовить вещи</button>
-                     </td>
-                  </tr>
-               ))}
-               {bookings.length === 0 && (
-                  <tr><td colSpan={5} className="p-4 text-center text-slate-400">Нет активных бронирований</td></tr>
-               )}
-            </tbody>
-         </table>
-      </div>
-   </div>
-);
-
-const SupplierManagementView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers, setSuppliers }) => (
-   <div className="space-y-4 animate-fade-in">
-      <h2 className="text-2xl font-bold">Поставщики (B2B)</h2>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-         <table className="w-full text-left text-sm min-w-[800px]">
-            <thead className="bg-slate-50 text-slate-500">
-               <tr>
-                  <th className="p-4">Поставщик</th>
-                  <th className="p-4">Контакт</th>
-                  <th className="p-4">Баланс</th>
-                  <th className="p-4">Статус</th>
-                  <th className="p-4">Рейтинг</th>
-                  <th className="p-4">Действия</th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-               {suppliers.map(s => (
-                  <tr key={s.id} className="hover:bg-slate-50">
-                     <td className="p-4 font-bold text-slate-800">{s.name}</td>
-                     <td className="p-4">
-                        <div>{s.contactName}</div>
-                        <div className="text-xs text-slate-500">{s.phone}</div>
-                     </td>
-                     <td className={`p-4 font-bold ${s.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>{s.balance} с.</td>
-                     <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'active' ? 'bg-green-100 text-green-700' : s.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                           {s.status}
-                        </span>
-                     </td>
-                     <td className="p-4 text-orange-400 font-bold">{s.rating} ★</td>
-                     <td className="p-4 flex gap-2">
-                        {s.status === 'pending' && (
-                           <button onClick={() => setSuppliers(suppliers.map(sup => sup.id === s.id ? {...sup, status: 'active'} : sup))} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">
-                              Одобрить
-                           </button>
-                        )}
-                        <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
-                     </td>
-                  </tr>
-               ))}
-            </tbody>
-         </table>
-      </div>
-   </div>
-);
-
-// --- NEW SHOPS VIEW FOR MARKETPLACE ---
-const ShopsView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers, setSuppliers }) => (
-   <div className="space-y-4 animate-fade-in">
-      <div className="flex justify-between items-center">
-         <h2 className="text-2xl font-bold">Магазины (Маркетплейс)</h2>
-         <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-            <Icon icon="solar:shop-bold" />
-            Добавить магазин
-         </button>
-      </div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-         <table className="w-full text-left text-sm min-w-[800px]">
-            <thead className="bg-slate-50 text-slate-500">
-               <tr>
-                  <th className="p-4">Магазин</th>
-                  <th className="p-4">Владелец</th>
-                  <th className="p-4">Товаров</th>
-                  <th className="p-4">Комиссия</th>
-                  <th className="p-4">Баланс</th>
-                  <th className="p-4">Статус</th>
-                  <th className="p-4">Действия</th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-               {suppliers.map(s => (
-                  <tr key={s.id} className="hover:bg-slate-50">
-                     <td className="p-4 font-bold text-slate-800">{s.name}</td>
-                     <td className="p-4">
-                        <div>{s.contactName}</div>
-                        <div className="text-xs text-slate-500">{s.phone}</div>
-                     </td>
-                     <td className="p-4 font-bold">24</td>
-                     <td className="p-4 font-bold text-slate-600">{s.commissionRate || 10}%</td>
-                     <td className={`p-4 font-bold ${s.balance > 0 ? 'text-green-600' : 'text-slate-600'}`}>{s.balance} с.</td>
-                     <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'active' ? 'bg-green-100 text-green-700' : s.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                           {s.status}
-                        </span>
-                     </td>
-                     <td className="p-4 flex gap-2">
-                        {s.status === 'pending' && (
-                           <button onClick={() => setSuppliers(suppliers.map(sup => sup.id === s.id ? {...sup, status: 'active'} : sup))} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-bold">Одобрить</button>
-                        )}
-                        <button className="text-slate-400 hover:text-primary"><Icon icon="solar:settings-bold" /></button>
-                     </td>
-                  </tr>
-               ))}
-            </tbody>
-         </table>
-      </div>
-   </div>
-);
-
-const DepartmentsView: React.FC = () => (
-  <div className="space-y-4 animate-fade-in">
-    <div className="flex justify-between items-center">
-       <h2 className="text-2xl font-bold">Отделы</h2>
-       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-          <Icon icon="solar:add-circle-bold" />
-          Добавить отдел
-       </button>
-    </div>
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-      <table className="w-full text-left text-sm min-w-[600px]">
-         <thead className="bg-slate-50 text-slate-500">
-            <tr>
-               <th className="p-4">Название</th>
-               <th className="p-4">Описание</th>
-               <th className="p-4">Товаров</th>
-               <th className="p-4">Статус</th>
-               <th className="p-4">Действия</th>
+    <h2 className="text-2xl font-bold">Клиенты</h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th className="p-4">Имя</th>
+            <th className="p-4">Телефон</th>
+            <th className="p-4">Заказов</th>
+            <th className="p-4">Потрачено</th>
+            <th className="p-4">Статус</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {customers.map(c => (
+            <tr key={c.id} className="hover:bg-slate-50">
+              <td className="p-4 font-bold text-slate-800">{c.name}</td>
+              <td className="p-4 text-slate-600">{c.phone}</td>
+              <td className="p-4">{c.ordersCount}</td>
+              <td className="p-4 font-bold">{c.totalSpent} с.</td>
+              <td className="p-4">
+                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{c.status}</span>
+              </td>
             </tr>
-         </thead>
-         <tbody className="divide-y divide-slate-100">
-            {MOCK_DEPARTMENTS.map(d => (
-               <tr key={d.id} className="hover:bg-slate-50">
-                  <td className="p-4 font-bold text-slate-800">{d.name}</td>
-                  <td className="p-4 text-slate-600">{d.description}</td>
-                  <td className="p-4">{d.productCount}</td>
-                  <td className="p-4">
-                     <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${d.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {d.status}
-                     </span>
-                  </td>
-                  <td className="p-4 flex gap-2">
-                     <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
-                  </td>
-               </tr>
-            ))}
-         </tbody>
+          ))}
+        </tbody>
       </table>
     </div>
   </div>
 );
 
-const CategoriesView: React.FC = () => (
+const ShopsView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers }) => (
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="text-2xl font-bold">Магазины (Партнеры)</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+       {suppliers.map(s => (
+          <div key={s.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+             <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-lg">{s.name}</h3>
+                <span className="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-1 rounded">ID: {s.id}</span>
+             </div>
+             <div className="text-sm text-slate-500 mb-4">{s.contactName} • {s.phone}</div>
+             <div className="flex justify-between items-center pt-4 border-t border-slate-50">
+                <div className="text-xs font-bold text-slate-400">Рейтинг</div>
+                <div className="flex text-orange-400 text-xs">
+                   {[...Array(5)].map((_, i) => <Icon key={i} icon={i < Math.floor(s.rating) ? "solar:star-bold" : "solar:star-linear"} />)}
+                </div>
+             </div>
+          </div>
+       ))}
+    </div>
+  </div>
+);
+
+const SupplierManagementView: React.FC<{ suppliers: Supplier[], setSuppliers: (s: Supplier[]) => void }> = ({ suppliers }) => (
   <div className="space-y-4 animate-fade-in">
     <div className="flex justify-between items-center">
-       <h2 className="text-2xl font-bold">Категории</h2>
-       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-          <Icon icon="solar:add-circle-bold" />
-          Добавить категорию
-       </button>
+       <h2 className="text-2xl font-bold">Управление поставщиками</h2>
+       <button className="bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md">Добавить</button>
     </div>
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-      <table className="w-full text-left text-sm min-w-[600px]">
-         <thead className="bg-slate-50 text-slate-500">
-            <tr>
-               <th className="p-4">Фото</th>
-               <th className="p-4">Название</th>
-               <th className="p-4">Подкатегории</th>
-               <th className="p-4">Отдел</th>
-               <th className="p-4">Действия</th>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th className="p-4">Название</th>
+            <th className="p-4">Контакт</th>
+            <th className="p-4">Баланс</th>
+            <th className="p-4">Посл. поставка</th>
+            <th className="p-4">Статус</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {suppliers.map(s => (
+            <tr key={s.id} className="hover:bg-slate-50">
+              <td className="p-4 font-bold text-slate-800">{s.name}</td>
+              <td className="p-4 text-slate-600">
+                 <div>{s.contactName}</div>
+                 <div className="text-xs text-slate-400">{s.phone}</div>
+              </td>
+              <td className="p-4 font-bold text-slate-800">{s.balance} с.</td>
+              <td className="p-4 text-slate-500">{s.lastDelivery}</td>
+              <td className="p-4">
+                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span>
+              </td>
             </tr>
-         </thead>
-         <tbody className="divide-y divide-slate-100">
-            {MOCK_CATEGORIES.map(c => (
-               <tr key={c.id} className="hover:bg-slate-50">
-                  <td className="p-4">
-                     <img src={c.image} className="size-10 rounded-lg object-cover bg-slate-100" />
-                  </td>
-                  <td className="p-4 font-bold text-slate-800">{c.name}</td>
-                  <td className="p-4 text-slate-600 text-xs max-w-[200px] truncate">{c.subcategories.join(', ')}</td>
-                  <td className="p-4 text-slate-500">{MOCK_DEPARTMENTS.find(d => d.id === c.departmentId)?.name || '-'}</td>
-                  <td className="p-4 flex gap-2">
-                     <button className="text-slate-400 hover:text-primary"><Icon icon="solar:pen-bold" /></button>
-                  </td>
-               </tr>
-            ))}
-         </tbody>
+          ))}
+        </tbody>
       </table>
     </div>
   </div>
 );
 
 const MediaView: React.FC = () => (
-   <div className="space-y-4 animate-fade-in">
-      <div className="flex justify-between items-center">
-         <h2 className="text-2xl font-bold">Медиа библиотека</h2>
-         <button className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md flex items-center gap-2">
-            <Icon icon="solar:upload-bold" />
-            Загрузить
-         </button>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-         {MOCK_MEDIA_FILES.map(file => (
-            <div key={file.id} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm group cursor-pointer">
-               <div className="aspect-square bg-slate-50 rounded-lg mb-2 overflow-hidden flex items-center justify-center relative">
-                  {file.type === 'image' ? (
-                     <img src={file.url} className="w-full h-full object-cover" />
-                  ) : (
-                     <Icon icon={file.type === 'video' ? "solar:videocamera-bold" : "solar:file-text-bold"} className="size-10 text-slate-300" />
-                  )}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                     <button className="text-white"><Icon icon="solar:eye-bold" /></button>
-                     <button className="text-red-400"><Icon icon="solar:trash-bin-trash-bold" /></button>
-                  </div>
-               </div>
-               <div className="px-1">
-                  <div className="text-xs font-bold text-slate-800 truncate">{file.name}</div>
-                  <div className="text-xs text-slate-400">{file.size}</div>
-               </div>
-            </div>
-         ))}
-      </div>
-   </div>
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="text-2xl font-bold">Медиафайлы</h2>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+       {MOCK_MEDIA_FILES.map(file => (
+          <div key={file.id} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm group relative">
+             <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden mb-2">
+                {file.type === 'image' ? <img src={file.url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><Icon icon="solar:file-text-bold" className="size-10" /></div>}
+             </div>
+             <div className="px-1">
+                <div className="font-bold text-sm truncate">{file.name}</div>
+                <div className="text-xs text-slate-400">{file.size}</div>
+             </div>
+          </div>
+       ))}
+    </div>
+  </div>
 );
 
 const LogsView: React.FC = () => (
-   <div className="space-y-4 animate-fade-in">
-      <h2 className="text-2xl font-bold">Журнал действий (Логи)</h2>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-         <table className="w-full text-left text-sm min-w-[800px]">
-            <thead className="bg-slate-50 text-slate-500">
-               <tr>
-                  <th className="p-4">Время</th>
-                  <th className="p-4">Пользователь</th>
-                  <th className="p-4">Действие</th>
-                  <th className="p-4">Модуль</th>
-                  <th className="p-4">Детали</th>
-                  <th className="p-4">IP</th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-               {MOCK_LOGS.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-50">
-                     <td className="p-4 text-slate-500 font-mono text-xs">{log.timestamp}</td>
-                     <td className="p-4">
-                        <div className="font-bold text-slate-800">{log.userName}</div>
-                        <div className="text-xs text-slate-400 uppercase">{log.userRole}</div>
-                     </td>
-                     <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                           log.actionType === 'create' ? 'bg-green-100 text-green-700' :
-                           log.actionType === 'delete' ? 'bg-red-100 text-red-700' :
-                           log.actionType === 'warning' ? 'bg-orange-100 text-orange-700' :
-                           'bg-blue-100 text-blue-700'
-                        }`}>
-                           {log.actionType}
-                        </span>
-                     </td>
-                     <td className="p-4 text-slate-600">{log.module}</td>
-                     <td className="p-4 text-slate-600">{log.details}</td>
-                     <td className="p-4 text-xs text-slate-400 font-mono">{log.ip}</td>
-                  </tr>
-               ))}
-            </tbody>
-         </table>
-      </div>
-   </div>
+  <div className="space-y-4 animate-fade-in">
+    <h2 className="text-2xl font-bold">Логи действий</h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+       <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500">
+             <tr>
+                <th className="p-4">Время</th>
+                <th className="p-4">Пользователь</th>
+                <th className="p-4">Действие</th>
+                <th className="p-4">Модуль</th>
+                <th className="p-4">IP</th>
+             </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+             {MOCK_LOGS.map(log => (
+                <tr key={log.id} className="hover:bg-slate-50">
+                   <td className="p-4 text-slate-500 font-mono text-xs">{log.timestamp}</td>
+                   <td className="p-4 font-bold text-slate-800">
+                      {log.userName}
+                      <div className="text-[10px] text-slate-400 font-normal capitalize">{log.userRole}</div>
+                   </td>
+                   <td className="p-4">
+                      <div className="font-bold text-slate-800">{log.actionTitle}</div>
+                      <div className="text-xs text-slate-500">{log.details}</div>
+                   </td>
+                   <td className="p-4 text-slate-600">{log.module}</td>
+                   <td className="p-4 text-slate-400 text-xs">{log.ip}</td>
+                </tr>
+             ))}
+          </tbody>
+       </table>
+    </div>
+  </div>
 );
 
-// --- NEW VIEWS FOR TABLES & WAREHOUSE ---
+const SettingsView: React.FC = () => (
+  <div className="space-y-6 animate-fade-in">
+    <h2 className="text-2xl font-bold">Настройки магазина</h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-bold text-lg mb-4">Общие</h3>
+          <div className="space-y-4">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Название магазина</label>
+                <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue={MOCK_SETTINGS.general.storeName} />
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Телефон</label>
+                <input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue={MOCK_SETTINGS.general.phone} />
+             </div>
+          </div>
+       </div>
+       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-bold text-lg mb-4">Доставка</h3>
+          <div className="space-y-4">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Бесплатная доставка от</label>
+                <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue={MOCK_SETTINGS.shipping.freeShippingThreshold} />
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Стоимость стандартной доставки</label>
+                <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" defaultValue={MOCK_SETTINGS.shipping.standardShippingCost} />
+             </div>
+          </div>
+       </div>
+    </div>
+    <button className="bg-primary text-white px-8 py-4 rounded-xl font-bold shadow-lg">Сохранить настройки</button>
+  </div>
+);
 
-const TablesView: React.FC<{ 
-  employees: EmployeeExtended[], 
-  orders: Order[] 
-}> = ({ employees, orders }) => {
-   const [tables, setTables] = useState<PackingTable[]>(MOCK_PACKING_TABLES);
-   const [activeTable, setActiveTable] = useState<PackingTable | null>(null);
-   const [isEditOpen, setIsEditOpen] = useState(false);
-   const [currentTable, setCurrentTable] = useState<Partial<PackingTable>>({});
+// --- UPDATED FITTING ROOM VIEW ---
 
-   const handleSave = () => {
-      if (currentTable.id) {
-         setTables(tables.map(t => t.id === currentTable.id ? { ...t, ...currentTable } as PackingTable : t));
-      } else {
-         const newTable: PackingTable = {
-            id: `tbl-${Date.now()}`,
-            name: currentTable.name || 'New Table',
-            supervisorId: currentTable.supervisorId || '',
-            supervisorName: employees.find(e => e.id === currentTable.supervisorId)?.fullName || 'Unknown',
-            status: 'active',
-            currentOrderIds: [],
-            totalOrdersProcessed: 0
-         };
-         setTables([...tables, newTable]);
-      }
-      setIsEditOpen(false);
+const FittingRoomView: React.FC<{ bookings: FittingBooking[], products: Product[] }> = ({ bookings, products }) => {
+   // MOCK DATA FOR ROOMS (In real app, this would be in a DB)
+   const [rooms, setRooms] = useState([
+      { id: '1', name: 'Кабинка 1', status: 'free', client: '', timer: 0 },
+      { id: '2', name: 'Кабинка 2', status: 'occupied', client: 'Манижа К.', timer: 12 * 60 + 30 }, // 12m 30s
+      { id: '3', name: 'VIP Зал', status: 'cleaning', client: '', timer: 2 * 60 }, // 2m
+   ]);
+
+   const [activeModal, setActiveModal] = useState<'none' | 'prep' | 'checkout'>('none');
+   const [selectedBooking, setSelectedBooking] = useState<FittingBooking | null>(null);
+   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+   const [checkoutItems, setCheckoutItems] = useState<{productId: number, status: 'pending' | 'bought' | 'rejected', reason?: string}[]>([]);
+
+   // Timer Logic
+   useEffect(() => {
+      const interval = setInterval(() => {
+         setRooms(prev => prev.map(r => {
+            if (r.status === 'occupied' || r.status === 'cleaning') {
+               return { ...r, timer: r.timer + 1 };
+            }
+            return r;
+         }));
+      }, 1000);
+      return () => clearInterval(interval);
+   }, []);
+
+   const formatTime = (seconds: number) => {
+      const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const s = (seconds % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
    };
 
-   const handleDelete = (id: string) => {
-      if(confirm('Удалить этот стол?')) {
-         setTables(tables.filter(t => t.id !== id));
-      }
+   // Actions
+   const handleStartPrep = (booking: FittingBooking) => {
+      setSelectedBooking(booking);
+      setActiveModal('prep');
    };
 
-   if (activeTable) {
-      // WORKSTATION MODE
-      return (
-         <div className="space-y-4 animate-fade-in h-full flex flex-col">
-            {/* Header */}
-            <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-               <button onClick={() => setActiveTable(null)} className="p-2 hover:bg-slate-100 rounded-full">
-                  <Icon icon="solar:arrow-left-linear" className="size-6" />
-               </button>
-               <div>
-                  <h2 className="text-xl font-bold">{activeTable.name}</h2>
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                     <Icon icon="solar:user-id-bold" className="size-4" />
-                     {activeTable.supervisorName}
+   const confirmPrep = (roomId: string) => {
+      // Logic to move booking to room
+      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: 'occupied', client: selectedBooking?.customerName || 'Клиент', timer: 0 } : r));
+      setActiveModal('none');
+      setSelectedBooking(null);
+   };
+
+   const handleStartCheckout = (roomId: string) => {
+      const room = rooms.find(r => r.id === roomId);
+      setActiveRoomId(roomId);
+      // Mock items for checkout (usually would come from booking)
+      const items = bookings[0]?.items.map(id => ({ productId: id, status: 'pending' as const })) || [
+         { productId: 1, status: 'pending' as const }, 
+         { productId: 2, status: 'pending' as const }
+      ];
+      setCheckoutItems(items);
+      setActiveModal('checkout');
+   };
+
+   const finishCheckout = () => {
+      setRooms(prev => prev.map(r => r.id === activeRoomId ? { ...r, status: 'cleaning', client: '', timer: 0 } : r));
+      setActiveModal('none');
+      setActiveRoomId(null);
+   };
+
+   const finishCleaning = (roomId: string) => {
+      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: 'free', timer: 0 } : r));
+   };
+
+   return (
+      <div className="flex h-full gap-6 animate-fade-in">
+         {/* LEFT: ROOMS DASHBOARD */}
+         <div className="flex-1 flex flex-col gap-6">
+            <div className="flex justify-between items-center">
+               <h2 className="text-2xl font-bold text-slate-800">Пульт Примерочной</h2>
+               <div className="flex gap-2">
+                  <div className="flex items-center gap-1 text-xs font-bold px-3 py-1 bg-white rounded-full shadow-sm border border-slate-100">
+                     <div className="size-2 rounded-full bg-green-500"></div> Свободно
                   </div>
-               </div>
-               <div className="ml-auto flex gap-3">
-                  <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm flex items-center gap-2">
-                     <Icon icon="solar:box-bold" />
-                     В очереди: {activeTable.currentOrderIds.length}
-                  </div>
-                  <div className="px-4 py-2 bg-green-50 text-green-700 rounded-xl font-bold text-sm flex items-center gap-2">
-                     <Icon icon="solar:check-circle-bold" />
-                     Собрано: {activeTable.totalOrdersProcessed}
+                  <div className="flex items-center gap-1 text-xs font-bold px-3 py-1 bg-white rounded-full shadow-sm border border-slate-100">
+                     <div className="size-2 rounded-full bg-red-500"></div> Занято
                   </div>
                </div>
             </div>
 
-            {/* Workstation Content */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
-               {/* Left: Queue */}
-               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 font-bold text-slate-700">Очередь заказов</div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                     {activeTable.currentOrderIds.map(oid => {
-                        const order = orders.find(o => o.id === oid) || { id: oid, customerName: 'Unknown', items: [] };
-                        return (
-                           <div key={oid} className="p-3 border border-slate-100 rounded-xl hover:bg-slate-50 cursor-pointer group">
-                              <div className="flex justify-between mb-1">
-                                 <span className="font-bold text-sm">{oid}</span>
-                                 <span className="text-xs font-bold text-orange-500">Express</span>
-                              </div>
-                              <div className="text-xs text-slate-500 mb-2">{(order as Order).customerName}</div>
-                              <div className="flex gap-1">
-                                 {(order as Order).items?.slice(0, 4).map((item, i) => (
-                                    <div key={i} className={`size-8 rounded-md border flex items-center justify-center ${item.pickedStatus === 'picked' ? 'bg-green-100 border-green-300 text-green-700' : 'bg-red-50 border-red-100 text-red-300'}`}>
-                                       <Icon icon="solar:t-shirt-bold" className="size-4" />
-                                    </div>
-                                 ))}
-                              </div>
-                           </div>
-                        )
-                     })}
-                     <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm hover:border-primary hover:text-primary transition-colors">
-                        + Сканировать заказ
-                     </button>
-                  </div>
-               </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 flex-1 min-h-0">
+               {rooms.map(room => (
+                  <div 
+                     key={room.id} 
+                     className={`rounded-3xl p-6 flex flex-col justify-between relative border-2 transition-all ${
+                        room.status === 'free' ? 'bg-white border-slate-200 border-dashed' :
+                        room.status === 'occupied' ? 'bg-white border-red-500 shadow-xl shadow-red-500/10' :
+                        'bg-purple-50 border-purple-200'
+                     }`}
+                  >
+                     <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-xl font-black text-slate-800">{room.name}</h3>
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                           room.status === 'free' ? 'bg-green-100 text-green-700' :
+                           room.status === 'occupied' ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'
+                        }`}>
+                           {room.status === 'free' ? 'Свободно' : room.status === 'occupied' ? 'Занято' : 'Уборка'}
+                        </span>
+                     </div>
 
-               {/* Right: Active Workspace */}
-               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
-                  {/* Active Order Detail Mockup */}
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                     <Icon icon="solar:box-minimalistic-bold" className="size-24 opacity-20 mb-4" />
-                     <p>Выберите заказ из очереди или сканируйте штрих-код</p>
+                     <div className="flex-1 flex flex-col items-center justify-center text-center">
+                        {room.status === 'free' ? (
+                           <div className="text-slate-300">
+                              <Icon icon="solar:hanger-2-linear" className="size-16 mx-auto mb-2" />
+                              <p className="text-sm font-medium">Ожидание клиента</p>
+                           </div>
+                        ) : (
+                           <div>
+                              <div className="text-5xl font-black font-mono text-slate-800 mb-2">
+                                 {formatTime(room.timer)}
+                              </div>
+                              {room.client && (
+                                 <div className="text-sm font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg inline-block">
+                                    {room.client}
+                                 </div>
+                              )}
+                           </div>
+                        )}
+                     </div>
+
+                     <div className="mt-6 pt-6 border-t border-slate-100">
+                        {room.status === 'free' ? (
+                           <button disabled className="w-full py-3 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed">
+                              Выберите бронь из списка →
+                           </button>
+                        ) : room.status === 'occupied' ? (
+                           <div className="flex gap-2">
+                              <button className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-200">
+                                 +15 мин
+                              </button>
+                              <button 
+                                 onClick={() => handleStartCheckout(room.id)}
+                                 className="flex-[2] py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-500/30 hover:bg-red-600"
+                              >
+                                 Завершить (Checkout)
+                              </button>
+                           </div>
+                        ) : (
+                           <button 
+                              onClick={() => finishCleaning(room.id)}
+                              className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-600/30 hover:bg-purple-700 flex items-center justify-center gap-2"
+                           >
+                              <Icon icon="solar:broom-bold" />
+                              Уборка завершена
+                           </button>
+                        )}
+                     </div>
                   </div>
-               </div>
+               ))}
             </div>
          </div>
-      );
-   }
 
-   // OVERVIEW MODE
-   return (
-      <div className="space-y-6 animate-fade-in">
-         {/* Modal */}
-         {isEditOpen && (
+         {/* RIGHT: QUEUE SIDEBAR */}
+         <div className="w-80 bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-slate-100 bg-slate-50">
+               <h3 className="font-bold text-slate-800">Очередь (Сегодня)</h3>
+               <div className="text-xs text-slate-500 mt-1">{bookings.length} записей ожидают</div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+               {bookings.map(booking => (
+                  <div 
+                     key={booking.id} 
+                     onClick={() => handleStartPrep(booking)}
+                     className="p-3 border border-slate-100 rounded-2xl hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition-all group"
+                  >
+                     <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-lg text-slate-800">{booking.timeSlot}</span>
+                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-500 group-hover:bg-white">
+                           {booking.status}
+                        </span>
+                     </div>
+                     <div className="font-bold text-sm text-slate-700 mb-1">{booking.customerName}</div>
+                     <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Icon icon="solar:t-shirt-bold" />
+                        {booking.items.length} вещей
+                     </div>
+                  </div>
+               ))}
+               {bookings.length === 0 && (
+                  <div className="text-center py-10 text-slate-400">
+                     <Icon icon="solar:calendar-mark-linear" className="size-10 mx-auto mb-2 opacity-30" />
+                     <p className="text-sm">Нет записей на сегодня</p>
+                  </div>
+               )}
+            </div>
+         </div>
+
+         {/* MODALS */}
+         
+         {/* 1. PREP MODAL */}
+         {activeModal === 'prep' && selectedBooking && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-               <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                  <h3 className="text-xl font-bold mb-4">{currentTable.id ? 'Редактировать стол' : 'Новый стол'}</h3>
-                  <div className="space-y-4">
+               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Название</label>
-                        <input type="text" className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.name || ''} onChange={e => setCurrentTable({...currentTable, name: e.target.value})} />
+                        <h3 className="text-xl font-bold text-slate-800">Подготовка к примерке</h3>
+                        <p className="text-sm text-slate-500">{selectedBooking.customerName} • {selectedBooking.timeSlot}</p>
                      </div>
-                     <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Ответственный</label>
-                        <select className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.supervisorId || ''} onChange={e => setCurrentTable({...currentTable, supervisorId: e.target.value})}>
-                           <option value="">Выберите сотрудника</option>
-                           {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-                        </select>
+                     <button onClick={() => setActiveModal('none')} className="p-2 bg-white rounded-full hover:bg-slate-200"><Icon icon="solar:close-circle-bold" /></button>
+                  </div>
+                  <div className="p-6 max-h-[60vh] overflow-y-auto">
+                     <div className="space-y-4 mb-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase">Чек-лист консьержа</h4>
+                        <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-primary">
+                           <input type="checkbox" className="size-5 accent-primary" />
+                           <span className="font-bold text-sm text-slate-700">Вещи собраны со склада</span>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-primary">
+                           <input type="checkbox" className="size-5 accent-primary" />
+                           <span className="font-bold text-sm text-slate-700">Одежда отпарена (Steaming)</span>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-primary">
+                           <input type="checkbox" className="size-5 accent-primary" />
+                           <span className="font-bold text-sm text-slate-700">Открытка подписана</span>
+                        </label>
                      </div>
-                     <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Статус</label>
-                        <select className="w-full p-3 bg-slate-50 border rounded-xl" value={currentTable.status || 'active'} onChange={e => setCurrentTable({...currentTable, status: e.target.value as any})}>
-                           <option value="active">Активен</option>
-                           <option value="busy">Занят (Перегруз)</option>
-                           <option value="closed">Закрыт</option>
-                        </select>
+                     
+                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Вещи в примерке</h4>
+                     <div className="flex gap-2 overflow-x-auto pb-2">
+                        {selectedBooking.items.map(itemId => {
+                           const product = products.find(p => p.id === itemId);
+                           if(!product) return null;
+                           return (
+                              <div key={itemId} className="size-20 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-slate-200 relative">
+                                 <img src={product.images[0]} className="w-full h-full object-cover" />
+                                 <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] font-bold text-center py-0.5">{product.sizes[0]}</div>
+                              </div>
+                           )
+                        })}
                      </div>
-                     <div className="flex gap-2 pt-2">
-                        <button onClick={() => setIsEditOpen(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-600">Отмена</button>
-                        <button onClick={handleSave} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Сохранить</button>
-                     </div>
+                  </div>
+                  <div className="p-6 border-t border-slate-100 bg-slate-50 grid grid-cols-2 gap-3">
+                     <button onClick={() => setActiveModal('none')} className="py-3 bg-white text-slate-600 rounded-xl font-bold border border-slate-200">Отмена</button>
+                     {/* Hardcoded to Room 2 for demo */}
+                     <button onClick={() => confirmPrep('2')} className="py-3 bg-primary text-white rounded-xl font-bold shadow-lg">
+                        Клиент пришел (Заселить)
+                     </button>
                   </div>
                </div>
             </div>
          )}
 
-         <div className="flex justify-between items-center">
-            <div>
-               <h2 className="text-2xl font-bold text-slate-800">Столы упаковки</h2>
-               <p className="text-sm text-slate-500">Управление зоной комплектации заказов</p>
+         {/* 2. CHECKOUT MODAL */}
+         {activeModal === 'checkout' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                     <h3 className="text-xl font-bold text-slate-800">Итоги примерки (Checkout)</h3>
+                     <button onClick={() => setActiveModal('none')} className="p-2 bg-white rounded-full hover:bg-slate-200"><Icon icon="solar:close-circle-bold" /></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                     <div className="space-y-3">
+                        {checkoutItems.map((item, idx) => {
+                           const product = products.find(p => p.id === item.productId);
+                           if(!product) return null;
+                           
+                           return (
+                              <div key={item.productId} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                                 <div className="flex items-start gap-4">
+                                    <div className="size-16 bg-slate-100 rounded-xl overflow-hidden shrink-0">
+                                       <img src={product.images[0]} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1">
+                                       <div className="font-bold text-slate-800 text-sm">{product.name}</div>
+                                       <div className="text-xs text-slate-500 mb-2">{product.price} с.</div>
+                                       <div className="flex gap-2">
+                                          <button 
+                                             onClick={() => {
+                                                const newItems = [...checkoutItems];
+                                                newItems[idx].status = 'bought';
+                                                setCheckoutItems(newItems);
+                                             }}
+                                             className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${item.status === 'bought' ? 'bg-green-500 text-white border-green-500' : 'bg-white text-slate-600 border-slate-200 hover:border-green-500'}`}
+                                          >
+                                             ✅ Купил
+                                          </button>
+                                          <button 
+                                             onClick={() => {
+                                                const newItems = [...checkoutItems];
+                                                newItems[idx].status = 'rejected';
+                                                setCheckoutItems(newItems);
+                                             }}
+                                             className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${item.status === 'rejected' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-600 border-slate-200 hover:border-red-500'}`}
+                                          >
+                                             ❌ Отказ
+                                          </button>
+                                       </div>
+                                    </div>
+                                 </div>
+                                 
+                                 {/* Rejection Reason */}
+                                 {item.status === 'rejected' && (
+                                    <div className="pl-[80px] animate-fade-in">
+                                       <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Причина отказа:</div>
+                                       <div className="flex flex-wrap gap-2">
+                                          {['Мало', 'Велико', 'Фасон', 'Качество', 'Дорого'].map(reason => (
+                                             <button 
+                                                key={reason}
+                                                onClick={() => {
+                                                   const newItems = [...checkoutItems];
+                                                   newItems[idx].reason = reason;
+                                                   setCheckoutItems(newItems);
+                                                }}
+                                                className={`px-3 py-1 rounded-lg text-xs font-bold border ${item.reason === reason ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}
+                                             >
+                                                {reason}
+                                             </button>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )}
+                              </div>
+                           );
+                        })}
+                     </div>
+                  </div>
+
+                  <div className="p-6 border-t border-slate-100 bg-white flex justify-between items-center">
+                     <div>
+                        <div className="text-xs text-slate-500">Итого куплено:</div>
+                        <div className="text-2xl font-black text-slate-900">
+                           {checkoutItems.filter(i => i.status === 'bought').reduce((acc, i) => {
+                              const p = products.find(prod => prod.id === i.productId);
+                              return acc + (p?.price || 0);
+                           }, 0)} с.
+                        </div>
+                     </div>
+                     <button onClick={finishCheckout} className="px-8 py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                        Завершить сессию
+                     </button>
+                  </div>
+               </div>
             </div>
-            <button 
-               onClick={() => { setCurrentTable({}); setIsEditOpen(true); }}
-               className="bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 hover:scale-105 transition-transform"
-            >
-               <Icon icon="solar:add-circle-bold" className="size-5" />
-               Добавить стол
-            </button>
-         </div>
-
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tables.map(table => (
-               <div key={table.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative group hover:shadow-md transition-all">
-                  <div className="flex justify-between items-start mb-6">
-                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                           <h3 className="text-xl font-black text-slate-800">{table.name}</h3>
-                           <div className={`size-3 rounded-full ${table.status === 'active' ? 'bg-green-500 animate-pulse' : table.status === 'busy' ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                        </div>
-                        <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">{table.status === 'active' ? 'Активен' : table.status === 'busy' ? 'Перегружен' : 'Закрыт'}</div>
-                     </div>
-                     <div className="flex gap-1">
-                        <button onClick={() => { setCurrentTable(table); setIsEditOpen(true); }} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-                           <Icon icon="solar:pen-bold" />
-                        </button>
-                        <button onClick={() => handleDelete(table.id)} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors">
-                           <Icon icon="solar:trash-bin-trash-bold" />
-                        </button>
-                     </div>
-                  </div>
-
-                  <div className="space-y-4 mb-6">
-                     <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3 border border-slate-100">
-                        <div className="size-10 rounded-full bg-white flex items-center justify-center font-bold text-slate-500 border border-slate-200 shadow-sm">
-                           {table.supervisorName[0]}
-                        </div>
-                        <div>
-                           <div className="text-xs text-slate-400 font-bold uppercase">Супервайзер</div>
-                           <div className="font-bold text-sm text-slate-800">{table.supervisorName}</div>
-                        </div>
-                     </div>
-
-                     <div>
-                        <div className="flex justify-between text-xs font-bold mb-2">
-                           <span className="text-slate-500">Загрузка ({table.currentOrderIds.length})</span>
-                           <span className={table.currentOrderIds.length > 5 ? 'text-red-500' : 'text-green-500'}>{table.currentOrderIds.length > 5 ? 'Высокая' : 'Норма'}</span>
-                        </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                           <div className={`h-full rounded-full ${table.currentOrderIds.length > 5 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${Math.min(100, table.currentOrderIds.length * 10)}%`}}></div>
-                        </div>
-                     </div>
-                  </div>
-
-                  <button 
-                     onClick={() => setActiveTable(table)}
-                     className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
-                  >
-                     <Icon icon="solar:monitor-bold" />
-                     Открыть терминал
-                  </button>
-               </div>
-            ))}
-            
-            {/* Add Placeholder */}
-            <button 
-               onClick={() => { setCurrentTable({}); setIsEditOpen(true); }}
-               className="border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-primary hover:text-primary hover:bg-orange-50/50 transition-all cursor-pointer min-h-[280px]"
-            >
-               <div className="size-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
-                  <Icon icon="solar:add-circle-bold" className="size-8" />
-               </div>
-               <span className="font-bold text-lg">Добавить стол</span>
-            </button>
-         </div>
+         )}
       </div>
    );
 };
@@ -2032,13 +1544,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'warehouse', label: 'Склад', icon: 'solar:clipboard-list-bold' }, 
     { id: 'fitting', label: 'Примерочная', icon: 'solar:hanger-2-bold' },
     { id: 'products', label: 'Товары', icon: 'solar:t-shirt-bold' },
-    { id: 'approval', label: 'Модерация', icon: 'solar:check-circle-bold' }, // Added
-    { id: 'reviews', label: 'Отзывы', icon: 'solar:star-bold' }, // Added
-    { id: 'support', label: 'Поддержка', icon: 'solar:chat-round-dots-bold' }, // Added
+    { id: 'approval', label: 'Модерация', icon: 'solar:check-circle-bold' },
+    { id: 'reviews', label: 'Отзывы', icon: 'solar:star-bold' }, 
+    { id: 'support', label: 'Поддержка', icon: 'solar:chat-round-dots-bold' }, 
     { id: 'categories', label: 'Категории', icon: 'solar:layers-bold' },
     { id: 'departments', label: 'Отделы', icon: 'solar:sitemap-bold' },
     { id: 'finance', label: 'Финансы', icon: 'solar:bill-list-bold' }, 
-    { id: 'payouts', label: 'Выплаты', icon: 'solar:card-transfer-bold' }, // Added
+    { id: 'payouts', label: 'Выплаты', icon: 'solar:card-transfer-bold' },
     { id: 'customers', label: 'Клиенты', icon: 'solar:users-group-rounded-bold' },
     { id: 'returns', label: 'Возвраты (RMA)', icon: 'solar:restart-bold' },
     { id: 'shops', label: 'Магазины', icon: 'solar:shop-2-bold' },
@@ -2046,12 +1558,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: 'employees', label: 'Сотрудники', icon: 'solar:user-id-bold' },
     { id: 'promotions', label: 'Акции', icon: 'solar:gift-bold' }, 
     { id: 'couriers', label: 'Карта курьеров', icon: 'solar:map-point-bold' },
-    { id: 'delivery_zones', label: 'Зоны доставки', icon: 'solar:map-arrow-up-bold' }, // Added 
-    { id: 'notifications', label: 'Маркетинг', icon: 'solar:bell-bing-bold' }, // Added
-    { id: 'cms', label: 'CMS', icon: 'solar:file-text-bold' }, // Added
+    { id: 'delivery_zones', label: 'Зоны доставки', icon: 'solar:map-arrow-up-bold' }, 
+    { id: 'notifications', label: 'Маркетинг', icon: 'solar:bell-bing-bold' }, 
+    { id: 'cms', label: 'CMS', icon: 'solar:file-text-bold' }, 
     { id: 'media', label: 'Медиа', icon: 'solar:gallery-bold' },
-    { id: 'attributes', label: 'Атрибуты', icon: 'solar:tag-bold' }, // Added
-    { id: 'acl', label: 'Роли', icon: 'solar:shield-user-bold' }, // Added
+    { id: 'attributes', label: 'Атрибуты', icon: 'solar:tag-bold' }, 
+    { id: 'acl', label: 'Роли', icon: 'solar:shield-user-bold' }, 
     { id: 'logs', label: 'Логи', icon: 'solar:history-bold' },
     { id: 'settings', label: 'Настройки', icon: 'solar:settings-bold' },
   ];
@@ -2062,15 +1574,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case 'orders': return <KanbanBoard orders={orders} onUpdateStatus={() => {}} />; 
       case 'tables': return <TablesView employees={employees} orders={orders} />; 
       case 'warehouse': return <WarehouseView products={products} setProducts={setProducts} />; 
-      case 'fitting': return <FittingRoomView bookings={bookings} />;
+      case 'fitting': return <FittingRoomView bookings={bookings} products={products} />;
       case 'products': return <ProductsView products={products} setProducts={setProducts} categories={categories} suppliers={suppliers} />;
-      case 'approval': return <ProductApprovalView products={products} />; // Added
-      case 'reviews': return <ReviewsView />; // Added
-      case 'support': return <SupportView />; // Added
+      case 'approval': return <ProductApprovalView products={products} />;
+      case 'reviews': return <ReviewsView />;
+      case 'support': return <SupportView />;
       case 'categories': return <CategoriesView />;
       case 'departments': return <DepartmentsView />;
       case 'finance': return <FinanceView />;
-      case 'payouts': return <PayoutsView />; // Added
+      case 'payouts': return <PayoutsView />;
       case 'customers': return <CustomersView customers={customers} />;
       case 'returns': return <PlaceholderView title="Возвраты (RMA)" icon="solar:restart-bold" />;
       case 'shops': return <ShopsView suppliers={suppliers} setSuppliers={setSuppliers} />;
@@ -2078,12 +1590,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case 'employees': return <EmployeeManager employees={employees} setEmployees={setEmployees} shifts={shifts} setShifts={setShifts} financialRecords={financialRecords} setFinancialRecords={setFinancialRecords} />;
       case 'promotions': return <PromoBuilder />;
       case 'couriers': return <CourierMap />;
-      case 'delivery_zones': return <DeliveryZonesView />; // Added
-      case 'notifications': return <NotificationsView />; // Added
-      case 'cms': return <CMSView />; // Added
+      case 'delivery_zones': return <DeliveryZonesView />;
+      case 'notifications': return <NotificationsView />;
+      case 'cms': return <CMSView />;
       case 'media': return <MediaView />;
-      case 'attributes': return <AttributesView />; // Added
-      case 'acl': return <ACLView />; // Added
+      case 'attributes': return <AttributesView />;
+      case 'acl': return <ACLView />;
       case 'logs': return <LogsView />;
       case 'settings': return <SettingsView />;
       default: return <div className="text-center p-10 text-slate-400">Выберите пункт меню</div>;
